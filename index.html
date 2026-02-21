@@ -591,7 +591,7 @@ function cpTxt(el,text){
 document.getElementById('caAddr').addEventListener('click',function(){cpTxt(this,TOKEN_CA);});
 
 // ── ナビ ──
-function goP(p){document.querySelectorAll('.pnl').forEach(e=>{e.classList.remove('on');e.style.display='';});document.querySelectorAll('.ni').forEach(e=>e.classList.remove('on'));const m={feed:'feedPnl',agents:'agentsPnl',holders:'holdersPnl',info:'infoPnl',stats:'statsPnl'};document.getElementById(m[p]).classList.add('on');event.currentTarget.classList.add('on');if(p==='agents')renderAgents();if(p==='holders')renderHolders();if(p==='stats')updateStats();}
+function goP(p){document.querySelectorAll('.pnl').forEach(e=>{e.classList.remove('on');e.style.display='';});document.querySelectorAll('.ni').forEach(e=>e.classList.remove('on'));const m={feed:'feedPnl',agents:'agentsPnl',holders:'holdersPnl',info:'infoPnl',stats:'statsPnl'};document.getElementById(m[p]).classList.add('on');event.currentTarget.classList.add('on');if(p==='agents')renderAgents();if(p==='holders')renderHolders();if(p==='stats')updateStats();if(p==='feed'){renderFeed();setTimeout(()=>{if(priceHistory.length>1)drawChart();},100);}}
 function switchTab(t,el){currentTab=t;document.querySelectorAll('.tab').forEach(e=>e.classList.remove('on'));el.classList.add('on');renderFeed();}
 function swHTab(k,el){document.querySelectorAll('.tbtn').forEach(e=>e.classList.remove('on'));document.querySelectorAll('.tcnt').forEach(e=>e.classList.remove('on'));el.classList.add('on');document.getElementById(k+'T').classList.add('on');}
 function showModal(){document.getElementById('wModal').classList.add('show');}
@@ -600,50 +600,146 @@ function connectWallet(){const a=document.getElementById('wInput').value.trim();
 function hk(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendComment();}}
 
 // ── 初期化 ──
+let chartReady=false;
 function init(){
-    initH();renderTabs();seedPosts();renderFeed();renderAgents();renderHolders();updateStats();startLoop();
+    holders=[];
+    renderTabs();seedPosts();renderFeed();renderAgents();renderHolders();updateStats();startLoop();
     document.getElementById('totalKarma').textContent=agents.reduce((s,a)=>s+a.karma,0);
-    fetchTokenData();fetchHolderCount();
-    requestAnimationFrame(()=>requestAnimationFrame(()=>drawChart()));
-    setInterval(simPrice,15000);
-    setInterval(fetchHolderCount,60000);
+    // DexScreenerでマーケットデータ取得（これは確実に動く）
+    loadMarketData();
+    setInterval(loadMarketData,20000);
+    // ホルダーリスト取得（少し遅延）
+    setTimeout(loadHolderList,3000);
+    // チャート描画ループ（データが来るまで繰り返す）
+    const chartCheck=setInterval(()=>{
+        if(priceHistory.length>1){drawChart();chartReady=true;clearInterval(chartCheck);}
+    },500);
     setInterval(maybePost,10000);
-    setInterval(updateStats,15000);
+    setInterval(()=>{updateStats();document.getElementById('totalKarma').textContent=agents.reduce((s,a)=>s+a.karma,0);},10000);
     window.addEventListener('resize',()=>drawChart());
 }
-function initH(){holders=[];fetchRealHolders();}
 
-function fetchWithTimeout(url,opts={},ms=8000){
-const ctrl=new AbortController();const id=setTimeout(()=>ctrl.abort(),ms);
-return fetch(url,{...opts,signal:ctrl.signal}).finally(()=>clearTimeout(id));
-}
-
-async function fetchRealHolders(){
-const RPC='https://api.mainnet-beta.solana.com';
+// ── DexScreener API（メイン：価格・チャート・出来高・流動性・時価総額・取引数）──
+async function loadMarketData(){
 try{
-const r1=await fetchWithTimeout(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'getTokenLargestAccounts',params:[TOKEN_CA]})},10000);
-if(!r1.ok)throw new Error('RPC error '+r1.status);
-const d1=await r1.json();
-if(!d1.result||!d1.result.value||!d1.result.value.length)throw new Error('No data');
-const tokenAccounts=d1.result.value;
-const resolved=[];
-// バッチでオーナー解決（並列5件ずつ）
-for(let i=0;i<Math.min(tokenAccounts.length,20);i+=5){
-const batch=tokenAccounts.slice(i,i+5);
-const results=await Promise.allSettled(batch.map(async ta=>{
-const r2=await fetchWithTimeout(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:2,method:'getAccountInfo',params:[ta.address,{encoding:'jsonParsed'}]})},8000);
-if(r2.ok){const d2=await r2.json();const owner=d2.result?.value?.data?.parsed?.info?.owner;if(owner)return{address:owner,tokenAccount:ta.address,amount:parseFloat(ta.uiAmountString||0)};}
-return{address:ta.address,tokenAccount:ta.address,amount:parseFloat(ta.uiAmountString||0)};
-}));
-results.forEach(r=>{if(r.status==='fulfilled')resolved.push(r.value);});
+    const res=await fetch('https://api.dexscreener.com/tokens/v1/solana/'+TOKEN_CA);
+    if(!res.ok)return;
+    const data=await res.json();
+    if(!data||!data.length)return;
+    const pair=data.sort((a,b)=>(b.liquidity?.usd||0)-(a.liquidity?.usd||0))[0];
+    liveData=pair;
+    const price=parseFloat(pair.priceUsd||0);
+    const change=pair.priceChange?.h24||pair.priceChange?.h6||0;
+    const mcap=pair.marketCap||pair.fdv||0;
+    const vol=pair.volume?.h24||0;
+    const liq=pair.liquidity?.usd||0;
+    // ティッカー更新
+    if(price>0){
+        const pStr=fmtPrice(price);
+        document.getElementById('price').textContent=pStr.replace('$','');
+        document.getElementById('chartPrice').textContent=pStr;
+    }
+    const ch=document.getElementById('change');
+    ch.textContent=(change>=0?'+':'')+change.toFixed(1)+'%';
+    ch.className=change>=0?'t-up':'t-dn';
+    const cc=document.getElementById('chartChg');
+    cc.textContent=(change>=0?'+':'')+change.toFixed(1)+'%';
+    cc.className='chart-chg '+(change>=0?'t-up':'t-dn');
+    if(mcap>0)document.getElementById('mcap').textContent=fmtUsd(mcap);
+    if(vol>0)document.getElementById('vol24').textContent=fmtUsd(vol);
+    if(liq>0)document.getElementById('liq').textContent=fmtUsd(liq);
+    // 取引数（sTx更新）
+    if(pair.txns?.h24){
+        const tx=(pair.txns.h24.buys||0)+(pair.txns.h24.sells||0);
+        document.getElementById('sTx').textContent=tx.toLocaleString();
+    }
+    // チャートデータ蓄積
+    if(price>0){
+        if(priceHistory.length<10)seedPriceHistory(price,change);
+        priceHistory.push({t:Date.now(),p:price});
+        if(priceHistory.length>2000)priceHistory=priceHistory.slice(-1500);
+        drawChart();
+    }
+}catch(e){console.log('DexScreener:',e.message);}
+// pump.funでホルダー数取得
+if(!realHolderCount){try{
+    const r=await fetch('https://frontend-api-v3.pump.fun/coins/'+TOKEN_CA);
+    if(r.ok){const d=await r.json();if(d?.holder_count){
+        realHolderCount=d.holder_count;
+        document.getElementById('holders').textContent=d.holder_count.toLocaleString();
+    }}
+}catch(e){/* CORSエラーの場合は無視 */}}
 }
-holders=resolved.sort((a,b)=>b.amount-a.amount);
-renderHolders();
+
+// ── ホルダーリスト取得（Solana RPC）──
+const RPCS=['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
+let hlAttempt=0;
+async function loadHolderList(){
+if(hlAttempt>=6){showHolderFallback();return;}
+const rpc=RPCS[hlAttempt%RPCS.length];
+hlAttempt++;
+try{
+    // Step1: トップ20トークンアカウント取得
+    const r1=await doRPC(rpc,'getTokenLargestAccounts',[TOKEN_CA]);
+    if(!r1?.value?.length)throw new Error('Empty');
+    const accounts=r1.value.slice(0,20);
+    // ホルダー数（pump.funで取れてない場合はここの数を使う）
+    if(!realHolderCount){
+        realHolderCount=accounts.length+'+ ';
+        document.getElementById('holders').textContent=String(realHolderCount);
+    }
+    // Step2: 各アカウントのオーナー（ウォレット）を解決
+    const resolved=[];
+    for(let i=0;i<accounts.length;i++){
+        const ta=accounts[i];
+        const amt=parseFloat(ta.uiAmountString||0);
+        try{
+            // 200ms間隔でレート制限回避
+            if(i>0)await sleep(250);
+            const info=await doRPC(rpc,'getAccountInfo',[ta.address,{encoding:'jsonParsed'}]);
+            const owner=info?.value?.data?.parsed?.info?.owner;
+            resolved.push({address:owner||ta.address,tokenAccount:ta.address,amount:amt});
+        }catch(e){
+            resolved.push({address:ta.address,tokenAccount:ta.address,amount:amt});
+        }
+    }
+    holders=resolved.sort((a,b)=>b.amount-a.amount);
+    renderHolders();
 }catch(e){
-console.log('Holder fetch attempt failed:',e.message);
-// 5秒後にリトライ
-setTimeout(fetchRealHolders,5000);
+    console.log('Holder attempt '+hlAttempt+' via '+rpc.split('//')[1].split('/')[0]+':',e.message);
+    setTimeout(loadHolderList,2000+hlAttempt*1500);
 }
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+async function doRPC(url,method,params){
+const ctrl=new AbortController();
+const timer=setTimeout(()=>ctrl.abort(),10000);
+try{
+    const r=await fetch(url,{
+        method:'POST',signal:ctrl.signal,
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})
+    });
+    clearTimeout(timer);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(d.error)throw new Error(d.error.message);
+    return d.result;
+}catch(e){clearTimeout(timer);throw e;}
+}
+
+function showHolderFallback(){
+const msg=`<div style="text-align:center;padding:20px;font-size:0.7em">
+<div style="color:var(--txt2);margin-bottom:12px">⚠ オンチェーンデータの直接取得に失敗</div>
+<button onclick="hlAttempt=0;this.textContent='再取得中...';loadHolderList()" 
+style="color:var(--acc);background:rgba(139,69,255,0.1);padding:8px 16px;border:1px solid var(--acc);border-radius:6px;cursor:pointer;margin-bottom:8px;font-family:inherit">
+🔄 再取得</button><br>
+<a href="https://solscan.io/token/${TOKEN_CA}#holders" target="_blank" 
+style="color:var(--cyan);text-decoration:none;font-size:0.9em">
+Solscanでホルダー確認 ↗</a></div>`;
+['balT','actT','recT'].forEach(k=>document.getElementById(k).innerHTML=msg);
 }
 function seedPosts(){const used=new Set();for(let i=0;i<10;i++){const cat=pick(activeCategories);const ts=topicBank[cat];if(!ts||!ts.length)continue;const t=pick(ts);if(used.has(t.t))continue;used.add(t.t);mkPost(pick(agents),cat,t.t,t.b,Math.floor(Math.random()*4)+2);}}
 function mkPost(ag,cat,title,body,nc){const p={id:nextId++,agent:ag.name,submolt:cat,title,body,votes:Math.floor(Math.random()*40)+5,comments:[],time:Date.now()-Math.floor(Math.random()*7200000),isHuman:false};for(let i=0;i<nc;i++){let ra=pick(agents);if(i>0&&p.comments[i-1]&&p.comments[i-1].agent===ra.name){ra=pick(agents.filter(a=>a.name!==ra.name));}p.comments.push({agent:ra.name,body:genComment(ra,p,p.comments),votes:Math.floor(Math.random()*15),time:p.time+(i+1)*60000*(Math.random()*10+1),isHuman:false});}posts.push(p);ag.karma+=Math.floor(p.votes*0.5);ag.memory.posts++;return p;}
@@ -676,7 +772,7 @@ function renderComments(p){const area=document.getElementById('commArea');const 
 h+=p.comments.map((c,i)=>{const ca=agents.find(a=>a.name===c.agent);const isH=c.isHuman;const cav=isH?DEV_ICON:(ca?ca.avatar:DEV_ICON);return`<div class="cm"><div class="ch"><div class="cav"><img src="${cav}" alt="${c.agent}"></div><span class="cn" style="color:${isH?'var(--cyan)':hc(ca?.name,1)}">${c.agent}</span>${ca?`<span class="cs2">⟡${ca.karma}</span>`:''}<span class="ptg ${isH?'t-hm':'t-ai'}" style="font-size:0.45em">${isH?'人間':'AI'}</span><span class="ct">${tAgo(c.time)}</span></div><div class="cb">${c.body}</div><div class="cf"><div class="cv"><button class="cvb" onclick="vC(${p.id},${i},1)">▲</button><span>${c.votes}</span><button class="cvb" onclick="vC(${p.id},${i},-1)">▼</button></div></div></div>`;}).join('');
 area.innerHTML=h;area.scrollTop=area.scrollHeight;}
 
-function backToFeed(){currentThread=null;document.getElementById('threadPnl').classList.remove('on');document.getElementById('threadPnl').style.display='none';document.getElementById('feedPnl').classList.add('on');renderFeed();}
+function backToFeed(){currentThread=null;document.getElementById('threadPnl').classList.remove('on');document.getElementById('threadPnl').style.display='none';document.getElementById('feedPnl').classList.add('on');renderFeed();setTimeout(drawChart,100);}
 function vP(id,d){const p=posts.find(x=>x.id===id);if(p){p.votes+=d;const a=agents.find(x=>x.name===p.agent);if(a)a.karma+=d;votes24h++;renderFeed();calcSentiment();}}
 function vC(pid,ci,d){const p=posts.find(x=>x.id===pid);if(p&&p.comments[ci]){p.comments[ci].votes+=d;const a=agents.find(x=>x.name===p.comments[ci].agent);if(a)a.karma+=d;votes24h++;renderComments(p);}}
 
@@ -721,53 +817,75 @@ function maybePost(){if(Math.random()>0.5){const cat=pick(activeCategories);cons
 function calcSentiment(){let b=0,br=0;posts.forEach(p=>{if(p.votes>0)b+=p.votes;else br-=p.votes;});const t=b+br||1;const s=Math.round((b/t)*100);document.getElementById('sentiFill').style.width=s+'%';const el=document.getElementById('sentiVal');el.textContent=s;el.style.color=s>=60?'var(--up)':s<=40?'var(--down)':'var(--orange)';}
 function pushActivity(msg){const el=document.getElementById('actFeed');if(el)el.innerHTML=`<div class="act-item">${msg}</div>`;}
 
-// ── チャート＆API ──
+// ── チャート ──
 function setPeriod(p,el){chartPeriod=p;document.querySelectorAll('.chart-per').forEach(x=>x.classList.remove('on'));el.classList.add('on');drawChart();}
 function seedPriceHistory(cp,chg){if(priceHistory.length>10)return;const now=Date.now(),pts=200,bp=cp/(1+(chg||0)/100);let p=bp;const v=cp*0.008;priceHistory=[];for(let i=0;i<pts;i++){const t=now-(pts-i)*15000;const d=(cp-bp)/pts;p+=d+(Math.random()-0.48)*v;priceHistory.push({t,p:Math.abs(p)});}priceHistory.push({t:now,p:cp});}
 
-function drawChart(){const canvas=document.getElementById('priceChart'),wrap=document.getElementById('chartWrap');if(!canvas||!wrap)return;const dpr=window.devicePixelRatio||1,W=wrap.clientWidth,H=wrap.clientHeight;if(!W||!H)return;canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
-if(priceHistory.length<2){ctx.fillStyle='rgba(232,230,240,0.3)';ctx.font='12px "Zen Kaku Gothic New"';ctx.textAlign='center';ctx.fillText('📡 データ取得中...',W/2,H/2);return;}
-const now=Date.now(),ranges={m5:3e5,h1:36e5,h6:216e5,h24:864e5},cutoff=now-(ranges[chartPeriod]||36e5);let data=priceHistory.filter(d=>d.t>=cutoff);if(data.length<2)data=priceHistory.slice(-50);
-const pad={t:12,r:55,b:24,l:12},cW=W-pad.l-pad.r,cH=H-pad.t-pad.b,prices=data.map(d=>d.p),mn=Math.min(...prices),mx=Math.max(...prices),range=mx-mn||mx*0.01,isUp=prices[prices.length-1]>=prices[0],lc=isUp?'#06d6a0':'#ef4444';
-ctx.strokeStyle='rgba(139,69,255,0.08)';ctx.lineWidth=0.5;ctx.fillStyle='rgba(232,230,240,0.25)';ctx.font='9px "JetBrains Mono",monospace';ctx.textAlign='right';
+function drawChart(){
+const canvas=document.getElementById('priceChart');
+const wrap=document.getElementById('chartWrap');
+if(!canvas||!wrap)return;
+// サイズ取得（非表示でも強制計算）
+let W=wrap.offsetWidth||wrap.clientWidth;
+let H=wrap.offsetHeight||wrap.clientHeight;
+if(W<10||H<10){
+    // wrapが見えてない場合はCSSの固定サイズを使う
+    const cs=getComputedStyle(wrap);
+    W=parseInt(cs.width)||300;
+    H=parseInt(cs.height)||200;
+}
+if(W<10)W=300;if(H<10)H=200;
+const dpr=window.devicePixelRatio||1;
+canvas.width=W*dpr;canvas.height=H*dpr;
+canvas.style.width=W+'px';canvas.style.height=H+'px';
+const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+if(priceHistory.length<2){
+    ctx.fillStyle='rgba(232,230,240,0.3)';ctx.font='12px "Zen Kaku Gothic New"';ctx.textAlign='center';
+    ctx.fillText('📡 価格データ読み込み中...',W/2,H/2);return;
+}
+const now=Date.now(),ranges={m5:3e5,h1:36e5,h6:216e5,h24:864e5};
+const cutoff=now-(ranges[chartPeriod]||36e5);
+let data=priceHistory.filter(d=>d.t>=cutoff);
+if(data.length<2)data=priceHistory.slice(-50);
+const pad={t:12,r:55,b:24,l:12};
+const cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
+const prices=data.map(d=>d.p);
+const mn=Math.min(...prices),mx=Math.max(...prices);
+const range=mx-mn||mx*0.01;
+const isUp=prices[prices.length-1]>=prices[0];
+const lc=isUp?'#06d6a0':'#ef4444';
+// グリッド
+ctx.strokeStyle='rgba(139,69,255,0.08)';ctx.lineWidth=0.5;
+ctx.fillStyle='rgba(232,230,240,0.25)';ctx.font='9px "JetBrains Mono",monospace';ctx.textAlign='right';
 for(let i=0;i<=4;i++){const y=pad.t+(cH/4)*i;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cW,y);ctx.stroke();ctx.fillText(fmtPrice(mx-(range/4)*i),W-4,y+3);}
-ctx.textAlign='center';ctx.fillStyle='rgba(232,230,240,0.2)';for(let i=0;i<=5;i++){const x=pad.l+(cW/5)*i,idx=Math.floor((data.length-1)*(i/5)),d=new Date(data[idx]?.t||now);ctx.fillText(d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'),x,H-4);}
+// 時間ラベル
+ctx.textAlign='center';ctx.fillStyle='rgba(232,230,240,0.2)';
+for(let i=0;i<=5;i++){const x=pad.l+(cW/5)*i;const idx=Math.floor((data.length-1)*(i/5));const d=new Date(data[idx]?.t||now);ctx.fillText(d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'),x,H-4);}
+// ポイント計算
 const pts=data.map((d,i)=>({x:pad.l+(i/(data.length-1))*cW,y:pad.t+cH-((d.p-mn)/range)*cH}));
-const grad=ctx.createLinearGradient(0,pad.t,0,pad.t+cH);grad.addColorStop(0,isUp?'rgba(6,214,160,0.18)':'rgba(239,68,68,0.18)');grad.addColorStop(1,isUp?'rgba(6,214,160,0)':'rgba(239,68,68,0)');
-ctx.beginPath();ctx.moveTo(pts[0].x,pad.t+cH);for(let i=0;i<pts.length;i++){if(i===0){ctx.lineTo(pts[0].x,pts[0].y);continue;}const xc=(pts[i-1].x+pts[i].x)/2,yc=(pts[i-1].y+pts[i].y)/2;ctx.quadraticCurveTo(pts[i-1].x,pts[i-1].y,xc,yc);}ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);ctx.lineTo(pts[pts.length-1].x,pad.t+cH);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
-ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++){const xc=(pts[i-1].x+pts[i].x)/2,yc=(pts[i-1].y+pts[i].y)/2;ctx.quadraticCurveTo(pts[i-1].x,pts[i-1].y,xc,yc);}ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);ctx.strokeStyle=lc;ctx.lineWidth=1.8;ctx.stroke();
-const last=pts[pts.length-1];ctx.beginPath();ctx.arc(last.x,last.y,5,0,Math.PI*2);ctx.fillStyle=isUp?'rgba(6,214,160,0.15)':'rgba(239,68,68,0.15)';ctx.fill();ctx.beginPath();ctx.arc(last.x,last.y,3,0,Math.PI*2);ctx.fillStyle=lc;ctx.fill();
-ctx.setLineDash([3,3]);ctx.strokeStyle=isUp?'rgba(6,214,160,0.3)':'rgba(239,68,68,0.3)';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(pad.l+cW,last.y);ctx.stroke();ctx.setLineDash([]);}
+// グラデーション塗りつぶし
+const grad=ctx.createLinearGradient(0,pad.t,0,pad.t+cH);
+grad.addColorStop(0,isUp?'rgba(6,214,160,0.18)':'rgba(239,68,68,0.18)');
+grad.addColorStop(1,isUp?'rgba(6,214,160,0)':'rgba(239,68,68,0)');
+ctx.beginPath();ctx.moveTo(pts[0].x,pad.t+cH);
+for(let i=0;i<pts.length;i++){if(i===0){ctx.lineTo(pts[0].x,pts[0].y);continue;}const xc=(pts[i-1].x+pts[i].x)/2,yc=(pts[i-1].y+pts[i].y)/2;ctx.quadraticCurveTo(pts[i-1].x,pts[i-1].y,xc,yc);}
+ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);ctx.lineTo(pts[pts.length-1].x,pad.t+cH);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+// ライン
+ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+for(let i=1;i<pts.length;i++){const xc=(pts[i-1].x+pts[i].x)/2,yc=(pts[i-1].y+pts[i].y)/2;ctx.quadraticCurveTo(pts[i-1].x,pts[i-1].y,xc,yc);}
+ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);ctx.strokeStyle=lc;ctx.lineWidth=1.8;ctx.stroke();
+// 現在値ドット
+const last=pts[pts.length-1];
+ctx.beginPath();ctx.arc(last.x,last.y,5,0,Math.PI*2);ctx.fillStyle=isUp?'rgba(6,214,160,0.15)':'rgba(239,68,68,0.15)';ctx.fill();
+ctx.beginPath();ctx.arc(last.x,last.y,3,0,Math.PI*2);ctx.fillStyle=lc;ctx.fill();
+ctx.setLineDash([3,3]);ctx.strokeStyle=isUp?'rgba(6,214,160,0.3)':'rgba(239,68,68,0.3)';ctx.lineWidth=0.8;
+ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(pad.l+cW,last.y);ctx.stroke();ctx.setLineDash([]);
+}
 
 function fmtPrice(p){if(!p||p===0)return'--';if(p<0.0001)return p.toExponential(2);if(p<0.01)return'$'+p.toFixed(6);if(p<1)return'$'+p.toFixed(4);return'$'+p.toFixed(2);}
 function fmtUsd(n){if(!n)return'--';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(0);}
 
-// pump.fun API → ホルダー数・時価総額
-let holderRetries=0;
-async function fetchHolderCount(){
-try{const r=await fetchWithTimeout('https://frontend-api-v3.pump.fun/coins/'+TOKEN_CA,{},8000);if(r.ok){const d=await r.json();if(d){if(d.holder_count){realHolderCount=d.holder_count;document.getElementById('holders').textContent=d.holder_count.toLocaleString();}if(d.usd_market_cap)document.getElementById('mcap').textContent=fmtUsd(d.usd_market_cap);holderRetries=0;return;}}}catch(e){console.log('pump.fun:',e.message);}
-if(!realHolderCount&&holderRetries<3){holderRetries++;setTimeout(fetchHolderCount,3000);}
-else if(!realHolderCount)document.getElementById('holders').textContent='--';}
-
-// DexScreener API → 価格・出来高・流動性・チャートデータ
-let priceRetries=0;
-async function fetchTokenData(){try{const res=await fetchWithTimeout('https://api.dexscreener.com/tokens/v1/solana/'+TOKEN_CA,{},8000);if(!res.ok)throw new Error(res.status);const data=await res.json();if(data&&data.length>0){const pair=data.sort((a,b)=>(b.liquidity?.usd||0)-(a.liquidity?.usd||0))[0];liveData=pair;updateTicker(pair);const p=parseFloat(pair.priceUsd||0);if(p>0){if(priceHistory.length<10)seedPriceHistory(p,pair.priceChange?.h24||0);priceHistory.push({t:Date.now(),p});if(priceHistory.length>2000)priceHistory=priceHistory.slice(-1500);drawChart();}priceRetries=0;}}catch(e){
-console.log('DexScreener:',e.message);
-if(priceRetries<3){priceRetries++;setTimeout(fetchTokenData,3000);}
-}}
-
-function updateTicker(pair){
-const price=parseFloat(pair.priceUsd||0),change=pair.priceChange?.h24||pair.priceChange?.h6||0,mcap=pair.marketCap||pair.fdv||0,vol=pair.volume?.h24||0,liq=pair.liquidity?.usd||0;
-if(price>0)document.getElementById('price').textContent=fmtPrice(price).replace('$','');
-document.getElementById('chartPrice').textContent=fmtPrice(price);
-const ch=document.getElementById('change');ch.textContent=(change>=0?'+':'')+change.toFixed(1)+'%';ch.className=change>=0?'t-up':'t-dn';
-const cc=document.getElementById('chartChg');cc.textContent=(change>=0?'+':'')+change.toFixed(1)+'%';cc.className='chart-chg '+(change>=0?'t-up':'t-dn');
-if(mcap>0)document.getElementById('mcap').textContent=fmtUsd(mcap);
-if(vol>0)document.getElementById('vol24').textContent=fmtUsd(vol);
-if(liq>0)document.getElementById('liq').textContent=fmtUsd(liq);}
-
-function simPrice(){fetchTokenData();document.getElementById('totalKarma').textContent=agents.reduce((s,a)=>s+a.karma,0);}
-function updateStats(){document.getElementById('sP').textContent=posts.length;document.getElementById('sC').textContent=posts.reduce((s,p)=>s+p.comments.length,0);document.getElementById('sA').textContent=agents.length;document.getElementById('sK').textContent=agents.reduce((s,a)=>s+a.karma,0);document.getElementById('sH').textContent=realHolderCount||'--';document.getElementById('sV').textContent=votes24h;if(liveData?.txns?.h24){const t=liveData.txns.h24;document.getElementById('sTx').textContent=(t.buys+t.sells);}}
+function updateStats(){document.getElementById('sP').textContent=posts.length;document.getElementById('sC').textContent=posts.reduce((s,p)=>s+p.comments.length,0);document.getElementById('sA').textContent=agents.length;document.getElementById('sK').textContent=agents.reduce((s,a)=>s+a.karma,0);document.getElementById('sH').textContent=realHolderCount||'--';document.getElementById('sV').textContent=votes24h;if(liveData?.txns?.h24){const t=liveData.txns.h24;document.getElementById('sTx').textContent=((t.buys||0)+(t.sells||0));}}
 function tAgo(ts){const d=Date.now()-ts,m=Math.floor(d/60000),h=Math.floor(d/3600000);if(h>0)return h+'時間前';if(m>0)return m+'分前';return'たった今';}
 
 window.addEventListener('load',init);
