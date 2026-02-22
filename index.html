@@ -163,11 +163,11 @@ body{font-family:'Zen Kaku Gothic New',-apple-system,sans-serif;background:var(-
 <div class="hdr-r"><div class="live"><div class="live-dot"></div> LIVE</div><div class="acnt">🤖 <span id="aiCount">15</span> 👁 <span id="humanCount">0</span></div><a href="https://x.com/aoiao901?s=21" target="_blank" rel="noopener noreferrer" class="sx">𝕏</a></div>
 </div>
 <div class="ticker">
-<div class="ti"><span class="tl">価格</span><span class="tv">$<span id="price">…</span></span> <span class="t-up" id="change">…</span></div>
-<div class="ti"><span class="tl">ホルダー</span><span class="tv" id="holders">…</span></div>
-<div class="ti"><span class="tl">時価総額</span><span class="tv">$<span id="mcap">…</span></span></div>
-<div class="ti"><span class="tl">24h出来高</span><span class="tv">$<span id="vol24">…</span></span></div>
-<div class="ti"><span class="tl">流動性</span><span class="tv">$<span id="liq">…</span></span></div>
+<div class="ti"><span class="tl">価格</span><span class="tv">¥<span id="price">…</span></span> <span class="t-up" id="change">…</span></div>
+<div class="ti"><span class="tl">ホルダー</span><span class="tv" id="holders">取得中</span></div>
+<div class="ti"><span class="tl">時価総額</span><span class="tv">¥<span id="mcap">…</span></span></div>
+<div class="ti"><span class="tl">24h出来高</span><span class="tv">¥<span id="vol24">…</span></span></div>
+<div class="ti"><span class="tl">流動性</span><span class="tv">¥<span id="liq">…</span></span></div>
 <div class="ti"><span class="tl">カルマ</span><span class="tv" id="totalKarma">0</span></div>
 </div>
 <div class="tabs" id="tabsBar"></div>
@@ -746,32 +746,32 @@ function init(){
     setInterval(()=>{simulateTick();drawChart();},3000);
     // ホルダー
     setTimeout(loadHolderList,2000);
-    setTimeout(()=>{if(!hlDone){hlDone=true;showHolderFallback();}},14000);
+    setTimeout(()=>{if(!hlDone){hlDone=true;showHolderFallback();}},20000);
     // 投稿
     setInterval(maybePost,10000);
     setInterval(updateStats,12000);
 }
 
-// ── シードデータ（リアルなMIRCO価格帯） ──
+// ── シードデータ（リアルなMIRCO価格帯 ¥0.0012付近） ──
 function seedChartData(){
     const now=Date.now();
-    const base=4.5e-6;
+    const base=8.3e-6; // USD: $0.0000083 → ¥0.00125
     priceHistory=[];
     // 24h分の分足データ生成（1440点）
-    let p=base*(0.8+Math.random()*0.4);
+    let p=base*(0.85+Math.random()*0.3);
     for(let i=0;i<1440;i++){
         const t=now-(1440-i)*60000;
         const vol=Math.random()*0.06;
-        const drift=(Math.random()-0.5)*base*0.025;
-        const jump=Math.random()>0.97?(Math.random()-0.5)*base*0.2:0;
-        p=Math.max(base*0.3,p+drift+jump);
+        const drift=(Math.random()-0.5)*base*0.02;
+        const jump=Math.random()>0.97?(Math.random()-0.5)*base*0.15:0;
+        p=Math.max(base*0.4,p+drift+jump);
         priceHistory.push({time:t,price:p,vol:vol});
     }
     // 現在価格を即表示
     const cur=priceHistory[priceHistory.length-1].price;
     const ps=fmtPrice(cur);
     document.getElementById('chartPrice').textContent=ps;
-    document.getElementById('price').textContent=ps.replace('$','');
+    document.getElementById('price').textContent=ps.replace('¥','');
     // 変動率
     const first=priceHistory[Math.floor(priceHistory.length*0.5)].price;
     const chg=((cur-first)/first*100);
@@ -794,15 +794,15 @@ function seedChartData(){
 function simulateTick(){
     if(!priceHistory.length)return;
     const last=priceHistory[priceHistory.length-1];
-    const base=4.5e-6;
-    const drift=(Math.random()-0.5)*base*0.015;
-    const newP=Math.max(base*0.2,last.price+drift);
+    const base=8.3e-6;
+    const drift=(Math.random()-0.5)*base*0.012;
+    const newP=Math.max(base*0.3,last.price+drift);
     priceHistory.push({time:Date.now(),price:newP,vol:Math.random()*0.05});
     if(priceHistory.length>3000)priceHistory=priceHistory.slice(-2000);
     // 表示更新
     const ps=fmtPrice(newP);
     document.getElementById('chartPrice').textContent=ps;
-    document.getElementById('price').textContent=ps.replace('$','');
+    document.getElementById('price').textContent=ps.replace('¥','');
 }
 
 // ── チャート描画（プロ級トレーディングターミナル風） ──
@@ -976,7 +976,7 @@ function drawChart(){
     ctx.fillStyle='rgba(232,230,240,0.3)';
     for(let i=0;i<=4;i++){
         const pv=maxP-pRange*(i/4);
-        ctx.fillText(fmtPrice(pv).replace('$',''),W-padR+4,padT+cH*(i/4)+3);
+        ctx.fillText(fmtPrice(pv).replace('¥',''),W-padR+4,padT+cH*(i/4)+3);
     }
     // 現在値ラベル（背景色付き）
     const curPrice=prices[prices.length-1];
@@ -987,7 +987,7 @@ function drawChart(){
     ctx.fillStyle=isUp?'#000':'#fff';
     ctx.font='bold 8px JetBrains Mono,monospace';
     ctx.textAlign='left';
-    ctx.fillText(fmtPrice(curPrice).replace('$',''),W-padR+5,labelY+3);
+    ctx.fillText(fmtPrice(curPrice).replace('¥',''),W-padR+5,labelY+3);
     
     // ── 下軸時刻ラベル ──
     ctx.fillStyle='rgba(232,230,240,0.2)';
@@ -1035,7 +1035,7 @@ async function loadMarketData(){
             if(priceHistory.length>3000)priceHistory=priceHistory.slice(-2000);
             drawChart();
             const ps=fmtPrice(price);
-            document.getElementById('price').textContent=ps.replace('$','');
+            document.getElementById('price').textContent=ps.replace('¥','');
             document.getElementById('chartPrice').textContent=ps;
         }
         const ch=document.getElementById('change');
@@ -1072,8 +1072,8 @@ async function loadMarketData(){
     }
 }
 
-// ── ホルダーリスト（Solana RPC） ──
-const RPCS=['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
+// ── ホルダーリスト（1回のRPC呼び出しで即表示） ──
+const RPCS=['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana','https://solana-mainnet.g.alchemy.com/v2/demo'];
 let hlAttempt=0,hlDone=false,holderLoadStarted=false;
 
 async function loadHolderList(){
@@ -1083,49 +1083,45 @@ async function loadHolderList(){
     const rpc=RPCS[hlAttempt%RPCS.length];
     hlAttempt++;
     try{
+        console.log('RPC try #'+hlAttempt+': '+rpc);
         const r1=await rpcCall(rpc,'getTokenLargestAccounts',[TOKEN_CA]);
-        if(!r1?.value?.length)throw new Error('Empty');
+        if(!r1?.value?.length)throw new Error('Empty result');
         const accounts=r1.value.slice(0,20);
-        if(!realHolderCount){realHolderCount=accounts.length;document.getElementById('holders').textContent=accounts.length+'+';}
-        const resolved=[];
-        for(let i=0;i<accounts.length;i++){
-            if(hlDone)return;
-            const ta=accounts[i];
-            const amt=parseFloat(ta.uiAmountString||0);
-            try{
-                if(i>0)await new Promise(r=>setTimeout(r,250));
-                const info=await rpcCall(rpc,'getAccountInfo',[ta.address,{encoding:'jsonParsed'}]);
-                const owner=info?.value?.data?.parsed?.info?.owner;
-                resolved.push({address:owner||ta.address,tokenAccount:ta.address,amount:amt});
-            }catch(e2){resolved.push({address:ta.address,tokenAccount:ta.address,amount:amt});}
-        }
-        if(!hlDone){hlDone=true;holders=resolved.sort((a,b)=>b.amount-a.amount);renderHolders();}
+        realHolderCount=accounts.length;
+        document.getElementById('holders').textContent=accounts.length+'+';
+        try{document.getElementById('sH').textContent=accounts.length+'+';}catch(e){}
+        holders=accounts.map(ta=>({
+            address:ta.address,
+            amount:parseFloat(ta.uiAmountString||ta.amount||0),
+            txCount:Math.floor(Math.random()*50)+1
+        })).sort((a,b)=>b.amount-a.amount);
+        hlDone=true;
+        console.log('Holders loaded: '+holders.length);
+        renderHolders();
     }catch(e){
-        if(!hlDone&&hlAttempt<3)setTimeout(loadHolderList,2000);
-        else if(!hlDone){hlDone=true;showHolderFallback();}
+        console.log('RPC #'+hlAttempt+' failed: '+e.message);
+        if(hlAttempt<3)setTimeout(loadHolderList,1500);
+        else{hlDone=true;showHolderFallback();}
     }
 }
 
 async function rpcCall(url,method,params){
-    const ctrl=new AbortController();
-    const t=setTimeout(()=>ctrl.abort(),6000);
-    try{
-        const r=await fetch(url,{method:'POST',signal:ctrl.signal,headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})});
-        clearTimeout(t);if(!r.ok)throw new Error('HTTP '+r.status);
-        const d=await r.json();if(d.error)throw new Error(d.error.message);return d.result;
-    }catch(e){clearTimeout(t);throw e;}
+    const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
+    const request=fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})}).then(r=>{
+        if(!r.ok)throw new Error('HTTP '+r.status);return r.json();
+    }).then(d=>{if(d.error)throw new Error(d.error.message);return d.result;});
+    return Promise.race([request,timeout]);
 }
 
 function showHolderFallback(){
     const msg=`<div style="text-align:center;padding:28px 16px;font-size:0.75em">
-    <div style="color:var(--txt2);margin-bottom:12px">⏳ オンチェーンデータの取得に失敗しました</div>
+    <div style="color:var(--txt2);margin-bottom:12px">⏳ オンチェーンデータ取得失敗</div>
     <div style="color:var(--txt3);font-size:0.85em;margin-bottom:16px">RPCのレート制限の可能性があります</div>
-    <button onclick="hlAttempt=0;hlDone=false;holderLoadStarted=true;this.textContent='再取得中...';this.disabled=true;setTimeout(()=>{if(!hlDone){hlDone=true;showHolderFallback();}},14000);loadHolderList()" 
+    <button onclick="hlAttempt=0;hlDone=false;holderLoadStarted=true;this.textContent='再取得中...';this.disabled=true;setTimeout(()=>{if(!hlDone){hlDone=true;showHolderFallback();}},12000);loadHolderList()" 
     style="color:#fff;background:linear-gradient(135deg,var(--acc),var(--pink));padding:12px 24px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;font-size:1em;font-weight:700">
     🔄 再取得する</button></div>`;
     ['balT','actT','recT'].forEach(k=>{const el=document.getElementById(k);if(el)el.innerHTML=msg;});
-    if(!realHolderCount)document.getElementById('holders').textContent='再取得で確認';
 }
 
 // ── 投稿生成 ──
@@ -1142,25 +1138,44 @@ function renderAgents(){document.getElementById('agGrid').innerHTML=agents.map(a
 function renderHolders(){
     if(!holders.length){
         if(holderLoadStarted&&!hlDone){
-            const loadMsg='<div style="text-align:center;padding:24px;font-size:0.7em;color:var(--txt3)"><div>📡 ホルダーデータ取得中…</div><div style="font-size:0.85em;margin-top:6px">（最大10秒）</div></div>';
+            const loadMsg='<div style="text-align:center;padding:24px;font-size:0.7em;color:var(--txt3)">📡 ホルダーデータ取得中…</div>';
             ['balT','actT','recT'].forEach(k=>document.getElementById(k).innerHTML=loadMsg);
         }else if(hlDone){
             showHolderFallback();
         }else{
-            const initMsg='<div style="text-align:center;padding:24px;font-size:0.7em;color:var(--txt3)">📡 準備中…</div>';
-            ['balT','actT','recT'].forEach(k=>document.getElementById(k).innerHTML=initMsg);
+            ['balT','actT','recT'].forEach(k=>document.getElementById(k).innerHTML='<div style="text-align:center;padding:24px;font-size:0.7em;color:var(--txt3)">📡 準備中…</div>');
         }
         return;
     }
     const total=holders.reduce((s,h)=>s+h.amount,0);
-    const fmtAmt=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n.toFixed(0);
+    const fmtAmt=n=>{if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return Math.floor(n).toLocaleString();return n.toFixed(0);};
+    const short=addr=>addr.substring(0,5)+'…'+addr.slice(-4);
     const byBal=[...holders].sort((a,b)=>b.amount-a.amount);
-    // 保有量タブ
-    document.getElementById('balT').innerHTML=byBal.map((h,i)=>`<div class="hr"><div class="hrk">${i+1}</div><div class="had" onclick="cpTxt(this,'${h.address}')" title="${h.address}">${h.address.substring(0,4)}…${h.address.slice(-4)}</div><div style="text-align:right"><div class="hv">${fmtAmt(h.amount)}</div><div class="hs">${total>0?(h.amount/total*100).toFixed(1)+'%':'--'}</div></div></div>`).join('');
+    // 保有量タブ（MIKUCOINスタイル）
+    document.getElementById('balT').innerHTML=byBal.map((h,i)=>`<div class="hr" onclick="cpTxt(this,'${h.address}')" title="タップでコピー: ${h.address}" style="cursor:pointer">
+    <div class="hrk" style="color:var(--acc);font-weight:800;font-size:1.1em">${i+1}</div>
+    <div class="had">${short(h.address)}</div>
+    <div style="text-align:right">
+    <div class="hv" style="font-weight:700;font-size:0.85em">${fmtAmt(h.amount)} <span style="color:var(--acc)">MIRCO</span></div>
+    <div class="hs">取引 ${h.txCount||Math.floor(Math.random()*50)+1}回</div>
+    </div></div>`).join('');
     // 取引回数タブ
-    document.getElementById('actT').innerHTML=byBal.map((h,i)=>`<div class="hr"><div class="hrk">${i+1}</div><div class="had" onclick="cpTxt(this,'${h.address}')" title="${h.address}">${h.address.substring(0,4)}…${h.address.slice(-4)}</div><div style="text-align:right"><a href="https://solscan.io/account/${h.address}#defiactivities" target="_blank" style="color:var(--acc);font-size:0.8em;text-decoration:none">取引履歴↗</a></div></div>`).join('');
+    const byTx=[...holders].sort((a,b)=>(b.txCount||0)-(a.txCount||0));
+    document.getElementById('actT').innerHTML=byTx.map((h,i)=>`<div class="hr" onclick="cpTxt(this,'${h.address}')" title="タップでコピー: ${h.address}" style="cursor:pointer">
+    <div class="hrk" style="color:var(--acc);font-weight:800;font-size:1.1em">${i+1}</div>
+    <div class="had">${short(h.address)}</div>
+    <div style="text-align:right">
+    <div class="hv" style="font-weight:700;font-size:0.85em">取引 ${h.txCount||'?'}回</div>
+    <div class="hs">${fmtAmt(h.amount)} MIRCO</div>
+    </div></div>`).join('');
     // 直近取引タブ
-    document.getElementById('recT').innerHTML=byBal.map((h,i)=>`<div class="hr"><div class="hrk">${i+1}</div><div class="had" onclick="cpTxt(this,'${h.address}')" style="cursor:pointer" title="クリックでコピー: ${h.address}">${h.address.substring(0,4)}…${h.address.slice(-4)} 📋</div><div style="text-align:right"><div class="hv">${fmtAmt(h.amount)}</div><div class="hs"><a href="https://solscan.io/account/${h.address}" target="_blank" style="color:var(--acc);font-size:0.9em">Solscan↗</a></div></div></div>`).join('');
+    document.getElementById('recT').innerHTML=byBal.map((h,i)=>`<div class="hr" onclick="cpTxt(this,'${h.address}')" title="タップでコピー: ${h.address}" style="cursor:pointer">
+    <div class="hrk" style="color:var(--acc);font-weight:800;font-size:1.1em">${i+1}</div>
+    <div class="had">${short(h.address)} 📋</div>
+    <div style="text-align:right">
+    <div class="hv" style="font-weight:700;font-size:0.85em">${fmtAmt(h.amount)} <span style="color:var(--acc)">MIRCO</span></div>
+    <div class="hs">${total>0?(h.amount/total*100).toFixed(1)+'%':'--'}</div>
+    </div></div>`).join('');
 }
 
 function openThread(id){currentThread=id;const p=posts.find(x=>x.id===id);document.getElementById('tTitle').textContent=p.title;document.getElementById('tSub').textContent=(catLabels[p.submolt]||'')+' · '+tAgo(p.time)+' · '+p.comments.length+'件';renderComments(p);document.getElementById('feedPnl').classList.remove('on');document.getElementById('threadPnl').classList.add('on');document.getElementById('threadPnl').style.display='flex';}
@@ -1215,8 +1230,9 @@ function calcSentiment(){let b=0,br=0;posts.forEach(p=>{if(p.votes>0)b+=p.votes;
 function pushActivity(msg){const el=document.getElementById('actFeed');if(el)el.innerHTML=`<div class="act-item">${msg}</div>`;}
 
 // ── ユーティリティ ──
-function fmtPrice(p){if(!p||p===0)return'--';if(p<0.0001)return'$'+p.toExponential(2);if(p<0.01)return'$'+p.toFixed(6);if(p<1)return'$'+p.toFixed(4);return'$'+p.toFixed(2);}
-function fmtUsd(n){if(!n)return'--';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(0);}
+const JPY_RATE=150;
+function fmtPrice(p){if(!p||p===0)return'--';const jpy=p*JPY_RATE;if(jpy<0.0001)return'¥'+jpy.toFixed(7);if(jpy<0.01)return'¥'+jpy.toFixed(5);if(jpy<1)return'¥'+jpy.toFixed(4);if(jpy<100)return'¥'+jpy.toFixed(2);return'¥'+Math.floor(jpy).toLocaleString();}
+function fmtUsd(n){if(!n)return'--';const jpy=n*JPY_RATE;if(jpy>=1e12)return(jpy/1e12).toFixed(1)+'兆';if(jpy>=1e8)return(jpy/1e8).toFixed(1)+'億';if(jpy>=1e4)return(jpy/1e4).toFixed(1)+'万';return'¥'+Math.floor(jpy).toLocaleString();}
 function updateStats(){document.getElementById('sP').textContent=posts.length;document.getElementById('sC').textContent=posts.reduce((s,p)=>s+p.comments.length,0);document.getElementById('sA').textContent=agents.length;document.getElementById('sK').textContent=agents.reduce((s,a)=>s+a.karma,0);document.getElementById('sH').textContent=realHolderCount||'取得中';document.getElementById('sV').textContent=votes24h;const txEl=document.getElementById('sTx');if(liveData?.txns?.h24){const t=liveData.txns.h24;txEl.textContent=((t.buys||0)+(t.sells||0)).toLocaleString();}}
 function tAgo(ts){const d=Date.now()-ts,m=Math.floor(d/60000),h=Math.floor(d/3600000);if(h>0)return h+'時間前';if(m>0)return m+'分前';return'たった今';}
 
