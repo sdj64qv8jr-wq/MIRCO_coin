@@ -731,6 +731,8 @@ function init(){
     loadMarketData();
     setInterval(loadMarketData,25000);
     setTimeout(loadHolderList,3000);
+    // ホルダー取得の絶対タイムアウト（開始3秒+取得8秒=11秒後にフォールバック）
+    setTimeout(()=>{if(!hlDone){hlDone=true;showHolderFallback();}},11000);
     setInterval(maybePost,10000);
     setInterval(updateStats,12000);
     // 15秒後にまだ「…」のままの要素をN/Aに更新
@@ -811,47 +813,55 @@ async function loadMarketData(){
         }else{
             document.getElementById('sTx').textContent='0';
         }
-        if(pair.holders){realHolderCount=pair.holders;document.getElementById('holders').textContent=pair.holders.toLocaleString();}
-        else if(pair.makers?.h24){document.getElementById('holders').textContent=pair.makers.h24+'+';}
+        if(pair.holders){
+            realHolderCount=pair.holders;
+            document.getElementById('holders').textContent=pair.holders.toLocaleString();
+        }
         document.getElementById('totalKarma').textContent=agents.reduce((s,a)=>s+a.karma,0);
-        console.log('✅ Market data via',apiSource);
-    }else{
-        console.log('❌ All market APIs failed');
     }
-    // 4. pump.funでホルダー数補完
+    // ホルダー数が取れなかった場合：pump.fun → RPC結果 → Solscanリンク
     if(!realHolderCount){
         try{
             const r=await fetch('https://frontend-api-v3.pump.fun/coins/'+TOKEN_CA);
             if(r.ok){const d=await r.json();if(d?.holder_count){
                 realHolderCount=d.holder_count;
                 document.getElementById('holders').textContent=d.holder_count.toLocaleString();
-                console.log('✅ Holders via pump.fun:',d.holder_count);
             }}
-        }catch(e){/* CORS - 無視 */}
+        }catch(e){/* CORS */}
+    }
+    // それでも取れなければ、ホルダー数欄にSolscanリンクを表示
+    if(!realHolderCount){
+        document.getElementById('holders').innerHTML='<a href="https://solscan.io/token/'+TOKEN_CA+'#holders" target="_blank" style="color:var(--cyan);text-decoration:none;font-size:0.9em">確認↗</a>';
     }
 }
 
 // ── ホルダーリスト（Solana RPC） ──
 const RPCS=['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
 let hlAttempt=0;
+let hlDone=false;
+let holderLoadStarted=false;
+
 async function loadHolderList(){
-    if(hlAttempt>=4){showHolderFallback();return;}
+    holderLoadStarted=true;
+    if(hlDone)return;
+    if(hlAttempt>=2){if(!hlDone){hlDone=true;showHolderFallback();}return;}
     const rpc=RPCS[hlAttempt%RPCS.length];
     hlAttempt++;
     try{
         const r1=await rpcCall(rpc,'getTokenLargestAccounts',[TOKEN_CA]);
         if(!r1?.value?.length)throw new Error('Empty');
-        const accounts=r1.value.slice(0,20);
+        const accounts=r1.value.slice(0,15);
         if(!realHolderCount){
             realHolderCount=accounts.length;
             document.getElementById('holders').textContent=accounts.length+'+';
         }
         const resolved=[];
         for(let i=0;i<accounts.length;i++){
+            if(hlDone)return;
             const ta=accounts[i];
             const amt=parseFloat(ta.uiAmountString||0);
             try{
-                if(i>0)await new Promise(r=>setTimeout(r,220));
+                if(i>0)await new Promise(r=>setTimeout(r,200));
                 const info=await rpcCall(rpc,'getAccountInfo',[ta.address,{encoding:'jsonParsed'}]);
                 const owner=info?.value?.data?.parsed?.info?.owner;
                 resolved.push({address:owner||ta.address,tokenAccount:ta.address,amount:amt});
@@ -859,17 +869,21 @@ async function loadHolderList(){
                 resolved.push({address:ta.address,tokenAccount:ta.address,amount:amt});
             }
         }
-        holders=resolved.sort((a,b)=>b.amount-a.amount);
-        renderHolders();
+        if(!hlDone){
+            hlDone=true;
+            holders=resolved.sort((a,b)=>b.amount-a.amount);
+            renderHolders();
+        }
     }catch(e){
-        console.log('RPC attempt '+hlAttempt+':',e.message);
-        setTimeout(loadHolderList,2000+hlAttempt*2000);
+        if(!hlDone)setTimeout(loadHolderList,1500);
     }
 }
 
+// ホルダータイムアウトはinit内で管理
+
 async function rpcCall(url,method,params){
     const ctrl=new AbortController();
-    const t=setTimeout(()=>ctrl.abort(),12000);
+    const t=setTimeout(()=>ctrl.abort(),5000);
     try{
         const r=await fetch(url,{method:'POST',signal:ctrl.signal,headers:{'Content-Type':'application/json'},
             body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})});
@@ -882,14 +896,20 @@ async function rpcCall(url,method,params){
 }
 
 function showHolderFallback(){
-    const msg=`<div style="text-align:center;padding:24px;font-size:0.72em">
-    <div style="color:var(--txt2);margin-bottom:14px">⚠ オンチェーンデータ取得タイムアウト</div>
-    <button onclick="hlAttempt=0;this.textContent='🔄 再取得中...';this.disabled=true;loadHolderList()" 
-    style="color:var(--acc);background:rgba(139,69,255,0.1);padding:10px 20px;border:1px solid var(--acc);border-radius:8px;cursor:pointer;font-family:inherit;font-size:1em;margin-bottom:10px">
-    🔄 再取得する</button><br>
+    const msg=`<div style="text-align:center;padding:28px 16px;font-size:0.75em">
+    <div style="color:var(--txt2);margin-bottom:16px;line-height:1.6">📊 ホルダー情報は外部サイトで確認できます</div>
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;max-width:280px;margin:0 auto">
     <a href="https://solscan.io/token/${TOKEN_CA}#holders" target="_blank" 
-    style="color:var(--cyan);text-decoration:none;font-size:0.9em">Solscanで直接確認 ↗</a></div>`;
-    ['balT','actT','recT'].forEach(k=>document.getElementById(k).innerHTML=msg);
+    style="display:block;width:100%;color:#fff;background:linear-gradient(135deg,var(--acc),var(--pink));padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700;font-size:1em;font-family:inherit;text-align:center">
+    Solscanでホルダー確認 ↗</a>
+    <a href="https://pump.fun/coin/${TOKEN_CA}" target="_blank"
+    style="display:block;width:100%;color:var(--acc);padding:10px 20px;border:1px solid var(--bdr);border-radius:8px;text-decoration:none;font-size:0.9em;font-family:inherit;text-align:center">
+    Pump.funで確認 ↗</a>
+    <button onclick="hlAttempt=0;hlDone=false;holderLoadStarted=true;this.textContent='再取得中...';this.disabled=true;setTimeout(()=>{if(!hlDone){hlDone=true;showHolderFallback();}},10000);loadHolderList()" 
+    style="color:var(--txt3);background:none;padding:8px 16px;border:1px solid var(--bdr);border-radius:6px;cursor:pointer;font-family:inherit;font-size:0.85em;margin-top:4px">
+    🔄 オンチェーンデータ再取得</button>
+    </div></div>`;
+    ['balT','actT','recT'].forEach(k=>{const el=document.getElementById(k);if(el)el.innerHTML=msg;});
 }
 
 // ── 投稿生成 ──
@@ -905,8 +925,14 @@ function renderAgents(){document.getElementById('agGrid').innerHTML=agents.map(a
 
 function renderHolders(){
     if(!holders.length){
-        const loadMsg='<div style="text-align:center;padding:24px;font-size:0.7em;color:var(--txt3)">📡 ホルダーデータ読み込み中…</div>';
-        ['balT','actT','recT'].forEach(k=>document.getElementById(k).innerHTML=loadMsg);
+        // データなし→即フォールバック（「読み込み中」は出さない）
+        if(holderLoadStarted){
+            // ロード中ならローディング表示
+            const loadMsg='<div style="text-align:center;padding:24px;font-size:0.7em;color:var(--txt3)"><div style="margin-bottom:8px">📡 ホルダーデータ取得中…</div><div style="font-size:0.85em;color:var(--txt3)">（最大8秒で自動切替）</div></div>';
+            ['balT','actT','recT'].forEach(k=>document.getElementById(k).innerHTML=loadMsg);
+        }else{
+            showHolderFallback();
+        }
         return;
     }
     const total=holders.reduce((s,h)=>s+h.amount,0);
@@ -974,7 +1000,7 @@ function pushActivity(msg){const el=document.getElementById('actFeed');if(el)el.
 // ── ユーティリティ ──
 function fmtPrice(p){if(!p||p===0)return'--';if(p<0.0001)return'$'+p.toExponential(2);if(p<0.01)return'$'+p.toFixed(6);if(p<1)return'$'+p.toFixed(4);return'$'+p.toFixed(2);}
 function fmtUsd(n){if(!n)return'--';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(0);}
-function updateStats(){document.getElementById('sP').textContent=posts.length;document.getElementById('sC').textContent=posts.reduce((s,p)=>s+p.comments.length,0);document.getElementById('sA').textContent=agents.length;document.getElementById('sK').textContent=agents.reduce((s,a)=>s+a.karma,0);document.getElementById('sH').textContent=realHolderCount||'N/A';document.getElementById('sV').textContent=votes24h;const txEl=document.getElementById('sTx');if(liveData?.txns?.h24){const t=liveData.txns.h24;txEl.textContent=((t.buys||0)+(t.sells||0)).toLocaleString();}else if(txEl.textContent==='…'||txEl.textContent==='--'){txEl.textContent='0';}}
+function updateStats(){document.getElementById('sP').textContent=posts.length;document.getElementById('sC').textContent=posts.reduce((s,p)=>s+p.comments.length,0);document.getElementById('sA').textContent=agents.length;document.getElementById('sK').textContent=agents.reduce((s,a)=>s+a.karma,0);const shEl=document.getElementById('sH');if(realHolderCount){shEl.textContent=realHolderCount;}else{shEl.innerHTML='<a href="https://solscan.io/token/'+TOKEN_CA+'#holders" target="_blank" style="color:var(--cyan);text-decoration:none;font-size:0.5em">Solscan↗</a>';}document.getElementById('sV').textContent=votes24h;const txEl=document.getElementById('sTx');if(liveData?.txns?.h24){const t=liveData.txns.h24;txEl.textContent=((t.buys||0)+(t.sells||0)).toLocaleString();}else if(txEl.textContent==='…'||txEl.textContent==='--'){txEl.textContent='0';}}
 function tAgo(ts){const d=Date.now()-ts,m=Math.floor(d/60000),h=Math.floor(d/3600000);if(h>0)return h+'時間前';if(m>0)return m+'分前';return'たった今';}
 
 window.addEventListener('load',init);
