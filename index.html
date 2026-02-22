@@ -745,8 +745,8 @@ function init(){
     setInterval(loadMarketData,15000);
     setInterval(()=>{simulateTick();drawChart();},3000);
     // ホルダー
-    setTimeout(loadHolderList,2000);
-    setTimeout(()=>{if(!hlDone){hlDone=true;generateEstimatedHolders();}},18000);
+    setTimeout(loadHolderList,1500);
+    setTimeout(()=>{if(!hlDone){hlDone=true;if(!holders.length)generateEstimatedHolders();}},25000);
     // 投稿
     setInterval(maybePost,10000);
     setInterval(updateStats,12000);
@@ -1071,8 +1071,7 @@ async function loadMarketData(){
                 realHolderCount=Math.max(10,Math.floor(((pair.txns.h24.buys||0)+(pair.txns.h24.sells||0))*0.3));
             }
             if(realHolderCount){
-                document.getElementById('holders').textContent=realHolderCount.toLocaleString();
-                try{document.getElementById('sH').textContent=realHolderCount.toLocaleString();}catch(e){}
+                setHC(realHolderCount);
             }
         }
         document.getElementById('totalKarma').textContent=agents.reduce((s,a)=>s+a.karma,0);
@@ -1083,87 +1082,124 @@ async function loadMarketData(){
             const r=await fetch('https://frontend-api-v3.pump.fun/coins/'+TOKEN_CA);
             if(r.ok){const d=await r.json();if(d?.holder_count){
                 realHolderCount=d.holder_count;
-                document.getElementById('holders').textContent=d.holder_count.toLocaleString();
+                setHC(realHolderCount);
             }}
         }catch(e){}
     }
 }
 
-// ── ホルダーリスト ──
-const RPCS=['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana','https://solana-rpc.publicnode.com'];
-let hlAttempt=0,hlDone=false,holderLoadStarted=false,holdersEstimated=false;
+// ── ホルダーリスト（多段API取得） ──
+let hlDone=false,holderLoadStarted=false,holdersEstimated=false;
+
+function setHC(v){
+    const s=typeof v==='number'?v.toLocaleString():String(v);
+    document.getElementById('holders').textContent=s;
+    try{document.getElementById('sH').textContent=s;}catch(e){}
+}
+
+async function ft(url,ms){
+    return Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms||8000))]);
+}
 
 async function loadHolderList(){
     holderLoadStarted=true;
-    if(hlDone&&holders.length)return;
-    if(hlAttempt>=3){
-        if(!hlDone){hlDone=true;generateEstimatedHolders();}
-        return;
-    }
-    const rpc=RPCS[hlAttempt%RPCS.length];
-    hlAttempt++;
+    if(hlDone&&holders.length&&!holdersEstimated)return;
+    console.log('[Holders] Starting multi-API fetch...');
+
+    // ── 1. Solscan v2 ──
     try{
-        console.log('RPC try #'+hlAttempt+': '+rpc);
-        const r1=await rpcCall(rpc,'getTokenLargestAccounts',[TOKEN_CA]);
-        if(!r1?.value?.length)throw new Error('Empty');
-        const accounts=r1.value.slice(0,20);
-        if(!realHolderCount){
-            realHolderCount=accounts.length;
-            document.getElementById('holders').textContent=accounts.length+'+';
-            try{document.getElementById('sH').textContent=accounts.length+'+';}catch(e){}
-        }
-        holders=accounts.map(ta=>({
-            address:ta.address,
-            amount:parseFloat(ta.uiAmountString||ta.amount||0),
-            txCount:Math.floor(Math.random()*50)+1
-        })).sort((a,b)=>b.amount-a.amount);
-        hlDone=true;
-        holdersEstimated=false;
-        console.log('RPC OK: '+holders.length+' holders');
-        renderHolders();
-    }catch(e){
-        console.log('RPC #'+hlAttempt+' fail: '+e.message);
-        if(hlAttempt<3)setTimeout(loadHolderList,2000);
-        else{hlDone=true;generateEstimatedHolders();}
+        console.log('[H] Solscan v2...');
+        const r=await ft('https://api-v2.solscan.io/v2/token/holders?address='+TOKEN_CA+'&page=1&page_size=20');
+        if(r.ok){const d=await r.json();
+        const items=d?.data?.items||d?.data?.result;
+        if(items?.length){
+            holders=items.map(h=>({address:h.owner||h.address,amount:parseFloat(h.amount||0)/1e6,txCount:h.count||Math.floor(Math.random()*50)+1})).sort((a,b)=>b.amount-a.amount);
+            if(d.data?.total)realHolderCount=d.data.total;else realHolderCount=holders.length;
+            setHC(realHolderCount);hlDone=true;holdersEstimated=false;
+            console.log('[H] Solscan v2 OK: '+holders.length+' total:'+realHolderCount);
+            renderHolders();return;
+        }}
+    }catch(e){console.log('[H] Solscan v2: '+e.message);}
+
+    // ── 2. Solscan public v1 ──
+    try{
+        console.log('[H] Solscan v1...');
+        const r=await ft('https://public-api.solscan.io/token/holders?tokenAddress='+TOKEN_CA+'&limit=20&offset=0');
+        if(r.ok){const d=await r.json();
+        const items=Array.isArray(d)?d:(d?.data?.result||d?.data||null);
+        if(items?.length){
+            holders=items.map(h=>({address:h.owner||h.address,amount:parseFloat(h.amount||0)/1e6,txCount:Math.floor(Math.random()*50)+1})).sort((a,b)=>b.amount-a.amount);
+            realHolderCount=d?.total||d?.data?.total||holders.length;
+            setHC(realHolderCount);hlDone=true;holdersEstimated=false;
+            console.log('[H] Solscan v1 OK');renderHolders();return;
+        }}
+    }catch(e){console.log('[H] Solscan v1: '+e.message);}
+
+    // ── 3. Solscan meta (ホルダー数だけ) ──
+    if(!realHolderCount){
+        try{const r=await ft('https://public-api.solscan.io/token/meta?tokenAddress='+TOKEN_CA,5000);
+        if(r.ok){const d=await r.json();if(d?.holder){realHolderCount=d.holder;setHC(realHolderCount);console.log('[H] meta: '+realHolderCount);}}}catch(e){}
     }
+
+    // ── 4. Solana RPC × 3 ──
+    const rpcs=['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana','https://solana-rpc.publicnode.com'];
+    for(const rpc of rpcs){
+        try{
+            console.log('[H] RPC: '+rpc);
+            const body=JSON.stringify({jsonrpc:'2.0',id:1,method:'getTokenLargestAccounts',params:[TOKEN_CA]});
+            const r=await Promise.race([
+                fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body}).then(r=>r.json()),
+                new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),6000))
+            ]);
+            if(r?.result?.value?.length){
+                holders=r.result.value.slice(0,20).map(ta=>({
+                    address:ta.address,amount:parseFloat(ta.uiAmountString||ta.amount||0),
+                    txCount:Math.floor(Math.random()*50)+1
+                })).sort((a,b)=>b.amount-a.amount);
+                if(!realHolderCount){realHolderCount=holders.length;setHC(holders.length+'+');}
+                hlDone=true;holdersEstimated=false;
+                console.log('[H] RPC OK: '+holders.length);renderHolders();return;
+            }
+        }catch(e){console.log('[H] RPC fail: '+e.message);}
+    }
+
+    // ── 5. pump.fun (ホルダー数) ──
+    if(!realHolderCount){
+        try{const r=await ft('https://frontend-api-v3.pump.fun/coins/'+TOKEN_CA,5000);
+        if(r.ok){const d=await r.json();if(d?.holder_count){realHolderCount=d.holder_count;setHC(realHolderCount);console.log('[H] pump.fun: '+realHolderCount);}}}catch(e){}
+    }
+
+    // ── 6. DexScreenerのmakersから推定 ──
+    if(!realHolderCount&&liveData){
+        if(liveData.makers?.h24)realHolderCount=liveData.makers.h24;
+        else if(liveData.txns?.h24)realHolderCount=Math.max(10,Math.floor(((liveData.txns.h24.buys||0)+(liveData.txns.h24.sells||0))*0.3));
+        if(realHolderCount)setHC(realHolderCount);
+    }
+
+    // ── 7. 全API失敗 → 推定データ生成 ──
+    hlDone=true;
+    if(!holders.length)generateEstimatedHolders();
+    else renderHolders();
 }
 
 function generateEstimatedHolders(){
-    // DexScreenerから推定ホルダー数を使用（取れてなければ20）
     const count=realHolderCount||20;
     const supply=1e9;
-    // べき乗分布で推定保有量を生成
-    holders=[];
-    let remaining=supply*0.6; // 流通量の60%がトップ20に集中
+    holders=[];let remaining=supply*0.6;
     for(let i=0;i<Math.min(count,20);i++){
-        const share=remaining*(0.15+Math.random()*0.15);
-        remaining-=share;
-        // ランダムなSolanaアドレス風文字列を生成
-        const chars='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-        let addr='';for(let j=0;j<44;j++)addr+=chars[Math.floor(Math.random()*chars.length)];
+        const share=remaining*(0.12+Math.random()*0.12);remaining-=share;
+        const c='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        let addr='';for(let j=0;j<44;j++)addr+=c[Math.floor(Math.random()*c.length)];
         holders.push({address:addr,amount:Math.floor(share),txCount:Math.floor(Math.random()*50)+1});
     }
     holders.sort((a,b)=>b.amount-a.amount);
     holdersEstimated=true;
-    if(!realHolderCount){
-        realHolderCount=count;
-        document.getElementById('holders').textContent=count+'+';
-        try{document.getElementById('sH').textContent=count+'+';}catch(e){}
-    }
+    if(!realHolderCount){realHolderCount=count;setHC(count+'+');}
     renderHolders();
 }
 
-async function rpcCall(url,method,params){
-    const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
-    const request=fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})}).then(r=>{
-        if(!r.ok)throw new Error('HTTP '+r.status);return r.json();
-    }).then(d=>{if(d.error)throw new Error(d.error.message);return d.result;});
-    return Promise.race([request,timeout]);
-}
-
 function showHolderFallback(){
-    generateEstimatedHolders();
+    if(!holders.length)generateEstimatedHolders();else renderHolders();
 }
 
 // ── 投稿生成 ──
@@ -1193,8 +1229,8 @@ function renderHolders(){
     const byBal=[...holders].sort((a,b)=>b.amount-a.amount);
     // 推定データバナー
     const banner=holdersEstimated?`<div style="background:rgba(139,69,255,0.1);border:1px solid rgba(139,69,255,0.2);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:0.7em;display:flex;justify-content:space-between;align-items:center">
-    <span style="color:var(--txt2)">📊 推定データ（RPC取得失敗のため）</span>
-    <button onclick="hlAttempt=0;hlDone=false;holders=[];holdersEstimated=false;holderLoadStarted=true;renderHolders();loadHolderList()" style="color:var(--acc);background:none;border:1px solid var(--acc);padding:4px 12px;border-radius:5px;cursor:pointer;font-family:inherit;font-size:0.9em">🔄 再取得</button>
+    <span style="color:var(--txt2)">📊 推定データ（API取得失敗のため）</span>
+    <button onclick="hlDone=false;holders=[];holdersEstimated=false;holderLoadStarted=true;renderHolders();loadHolderList()" style="color:var(--acc);background:none;border:1px solid var(--acc);padding:4px 12px;border-radius:5px;cursor:pointer;font-family:inherit;font-size:0.9em">🔄 再取得</button>
     </div>`:'';
     // 保有量タブ
     document.getElementById('balT').innerHTML=banner+byBal.map((h,i)=>`<div class="hr" onclick="cpTxt(this,'${h.address}')" title="タップでコピー: ${h.address}" style="cursor:pointer">
