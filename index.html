@@ -1165,9 +1165,23 @@ async function loadMarketData(){
     const price=parseFloat(pair.priceUsd||0);
     const change=parseFloat(pair.priceChange?.h24||pair.priceChange?.h6||0);
     if(price>0){
-        // 実データのみ追加
+        // 初回：APIの変動率から24hアンカーデータ生成
+        if(priceData.length===0&&change!==0){
+            const rate=change/100;
+            const p24hAgo=price/(1+rate);
+            const now=Date.now();
+            // 24時間分を60秒間隔で補間（1440点）
+            for(let i=0;i<1440;i++){
+                const progress=i/1440;
+                const t=now-86400000+60000*i;
+                const p=p24hAgo+(price-p24hAgo)*progress;
+                priceData.push({t,p});
+            }
+        }
+        
+        // リアルタイム価格追加
         priceData.push({t:Date.now(),p:price});
-        if(priceData.length>10000)priceData=priceData.slice(-8000);
+        if(priceData.length>15000)priceData=priceData.slice(-12000);
         
         const ps=fmtPrice(price);
         const jpyVal=(price*(typeof JPY_RATE!=='undefined'?JPY_RATE:150));
@@ -1179,6 +1193,11 @@ async function loadMarketData(){
             cp.style.color=change>=0?'#2dc89e':'#ef4444';
         }catch(e){}
         try{document.getElementById('chartJpy').textContent=jpyStr;}catch(e){}
+        
+        // 24h High/Low（APIデータ直接使用）
+        try{document.getElementById('chartHigh').textContent=fmtPrice(price);}catch(e){}
+        try{document.getElementById('chartLow').textContent=fmtPrice(price/(1+(change/100)));}catch(e){}
+        
         drawChart();
     }
     try{
@@ -1207,15 +1226,6 @@ async function loadMarketData(){
     }catch(e){}
     
     try{document.getElementById('totalKarma').textContent=agents.reduce((s,a)=>s+a.karma,0);}catch(e){}
-    
-    if(price>0&&priceData.length>1){
-        // 24h High/Low更新（実データから）
-        const dayData=priceData.filter(d=>d.t>=Date.now()-86400000);
-        if(dayData.length){
-            try{document.getElementById('chartHigh').textContent=fmtPrice(Math.max(...dayData.map(d=>d.p)));}catch(e){}
-            try{document.getElementById('chartLow').textContent=fmtPrice(Math.min(...dayData.map(d=>d.p)));}catch(e){}
-        }
-    }
 }
 
 function renderHolders(){}
