@@ -1288,52 +1288,50 @@ async function loadMarketData(){
 
 function seedPriceHistory(currentPrice,change24h){
     const now=Date.now();
-    // pump.fun realistic: launch spike -> crash -> bottom -> gradual recovery -> current
-    const peakPrice=currentPrice*(2.5+Math.random()*1.5);
-    const bottomPrice=currentPrice*(0.3+Math.random()*0.15);
+    const rate=(change24h||0)/100;
+    const price24hAgo=currentPrice/(1+rate);
     
-    const span=86400000*3; // 3 days of 1-minute candles
+    // 1分足で3日分生成（APIの24h変動率をベースに正確なトレンド）
+    const span=86400000*3;
     const step=60000;
-    const total=Math.floor(span/step); // 4320
+    const total=Math.floor(span/step);
     candles=[];
     
-    let prev=peakPrice;
+    // 24h前→現在のトレンドを延長して3日分に
+    // 3日前の推定価格（24h変動率から逆算）
+    const price3dAgo=price24hAgo/(1+rate*0.5); // 緩やかに推定
+    
+    let prev=price3dAgo;
     for(let i=0;i<total;i++){
         const p=i/total;
         const t=now-span+(step*i);
         
-        // pump.fun phases
-        let target;
-        if(p<0.06){
-            // Phase 1: crash (first ~4.5 hours)
-            const f=p/0.06;
-            target=peakPrice+(bottomPrice-peakPrice)*(f*f);
-        }else if(p<0.30){
-            // Phase 2: bottom range (sideways)
-            const f=(p-0.06)/0.24;
-            target=bottomPrice*(1+0.06*f)+Math.sin(f*Math.PI*10)*bottomPrice*0.04;
-        }else{
-            // Phase 3: step-wise recovery (like pump.fun screenshot)
-            const f=(p-0.30)/0.70;
-            const step=Math.floor(f*12);
-            const stepP=step/12;
-            const inStep=f*12-step;
-            const base=bottomPrice+(currentPrice-bottomPrice)*stepP;
-            const next=bottomPrice+(currentPrice-bottomPrice)*Math.min((step+1)/12,1);
-            // Flat in step, then jump
-            target=inStep<0.85?base:base+(next-base)*(inStep-0.85)/0.15;
-            target+=Math.sin(f*Math.PI*25)*currentPrice*0.01;
-        }
+        // スムーズなトレンド（3日前→現在価格）
+        const smooth=p*p*(3-2*p); // smoothstep
+        const target=price3dAgo+(currentPrice-price3dAgo)*smooth;
         
-        const volM=p<0.06?3:p<0.30?1.2:0.8;
-        const v=target*0.003*volM*(0.3+Math.random()*0.7);
+        // 小さなリアルなノイズのみ（価格の0.3%程度）
+        const noise=target*0.003*(Math.random()-0.5)*2;
+        const microTrend=Math.sin(p*Math.PI*30)*target*0.002;
+        
+        const c=target+noise+microTrend;
         const o=prev;
-        const c=target+(Math.random()-0.5)*v;
-        const h=Math.max(o,c)+Math.random()*v*0.5;
-        const l=Math.min(o,c)-Math.random()*v*0.5;
-        candles.push({t,o:Math.max(o,1e-12),h:Math.max(h,1e-12),l:Math.max(l,1e-12),c:Math.max(c,1e-12),v:20+Math.random()*100*(p<0.06?4:1)});
+        const spread=Math.abs(noise)*0.6;
+        const h=Math.max(o,c)+Math.random()*spread;
+        const l=Math.min(o,c)-Math.random()*spread;
+        
+        candles.push({
+            t,
+            o:Math.max(o,1e-12),
+            h:Math.max(h,1e-12),
+            l:Math.max(l,1e-12),
+            c:Math.max(c,1e-12),
+            v:20+Math.random()*80
+        });
         prev=Math.max(c,1e-12);
     }
+    
+    // 最後を正確な現在価格にスナップ
     if(candles.length){
         const last=candles[candles.length-1];
         last.c=currentPrice;last.t=now;
