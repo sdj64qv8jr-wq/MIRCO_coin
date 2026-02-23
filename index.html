@@ -1271,6 +1271,20 @@ async function loadMarketData(){
         if(vol>0){document.getElementById('vol24').textContent=fmtUsd(vol);try{document.getElementById('chartVol').textContent=fmtUsd(vol);}catch(e){}}
         if(liq>0){document.getElementById('liq').textContent=fmtUsd(liq);}
     }catch(e){}
+    
+    try{
+        if(pair.txns?.h24){
+            const tx=(pair.txns.h24.buys||0)+(pair.txns.h24.sells||0);
+            document.getElementById('sTx').textContent=tx.toLocaleString();
+        }
+    }catch(e){}
+    
+    try{document.getElementById('totalKarma').textContent=agents.reduce((s,a)=>s+a.karma,0);}catch(e){}
+    
+    if(price>0&&candles.length<10){
+        seedPriceHistory(price,change);
+    }
+}
 
 function seedPriceHistory(currentPrice,change24h){
     const now=Date.now();
@@ -1349,21 +1363,6 @@ function aggCandles(raw,ms){
     }
     if(bkt)out.push(bkt);
     return out;
-}
-    }
-    
-    // 最後を正確な現在価格にスナップ
-    if(candles.length){
-        const last=candles[candles.length-1];
-        last.c=currentPrice;last.h=Math.max(last.h,currentPrice);
-        last.l=Math.min(last.l,currentPrice);last.t=now;
-    }
-    
-    // 時間順ソート
-    candles.sort((a,b)=>a.t-b.t);
-    
-    updateHighLow();
-    drawChart();
 }
 
 function updateHighLow(){
