@@ -110,8 +110,10 @@ body{font-family:'Zen Kaku Gothic New',-apple-system,sans-serif;background:var(-
 .chart-chg{font-size:0.65em;font-weight:600;margin-left:6px;padding:2px 6px;border-radius:4px}
 .chart-chg.t-up{background:rgba(6,214,160,0.12);color:var(--up)}
 .chart-chg.t-dn{background:rgba(239,68,68,0.12);color:var(--down)}
-.chart-canvas-wrap{position:relative;height:240px;padding:0 4px}
+.chart-canvas-wrap{position:relative;height:280px;padding:0 4px}
 .chart-canvas-wrap canvas{width:100%;height:100%;display:block}
+.chart-canvas-vol{position:relative;height:60px;padding:0 4px;border-top:1px solid rgba(139,69,255,0.06)}
+.chart-canvas-vol canvas{width:100%;height:100%;display:block}
 .chart-periods{display:flex;gap:4px;padding:6px 12px}
 .chart-per{padding:4px 10px;border-radius:4px;font-size:0.6em;font-weight:600;cursor:pointer;background:rgba(139,69,255,0.06);border:1px solid var(--bdr);color:var(--txt3);transition:all 0.2s;font-family:'JetBrains Mono',monospace}
 .chart-per.on{background:var(--acc);color:#fff;border-color:var(--acc)}
@@ -155,7 +157,7 @@ body{font-family:'Zen Kaku Gothic New',-apple-system,sans-serif;background:var(-
 .ref-icon{font-size:1.4em;min-width:32px;text-align:center}
 .ref-body{flex:1}.ref-name{font-size:0.8em;font-weight:700;margin-bottom:2px}.ref-desc{font-size:0.55em;color:var(--txt3)}
 .ref-arrow{font-size:0.9em;color:var(--acc);font-weight:700}
-@media(max-width:480px){.ag{grid-template-columns:repeat(2,1fr)}.ticker{gap:10px}.chart-canvas-wrap{height:200px}#priceCanvas{height:280px !important}}
+@media(max-width:480px){.ag{grid-template-columns:repeat(2,1fr)}.ticker{gap:10px}.chart-canvas-wrap{height:240px}.chart-canvas-vol{height:50px}}
 </style>
 </head>
 <body>
@@ -222,20 +224,25 @@ body{font-family:'Zen Kaku Gothic New',-apple-system,sans-serif;background:var(-
 </div>
 </div>
 <div class="chart-stats">
-<div class="cs-item"><div class="cs-l">MCap</div><div class="cs-v" id="chartMcap">--</div></div>
+<div class="cs-item"><div class="cs-l">24h High</div><div class="cs-v" id="chartHigh">--</div></div>
+<div class="cs-div"></div>
+<div class="cs-item"><div class="cs-l">24h Low</div><div class="cs-v" id="chartLow">--</div></div>
 <div class="cs-div"></div>
 <div class="cs-item"><div class="cs-l">Vol 24h</div><div class="cs-v" id="chartVol">--</div></div>
-<div class="cs-div"></div>
-<div class="cs-item"><div class="cs-l">Liq</div><div class="cs-v" id="chartLiq">--</div></div>
 </div>
 <div class="chart-periods" id="chartPeriods">
-<button class="cpb" onclick="setChartPeriod('1h',this)">1H</button>
-<button class="cpb on" onclick="setChartPeriod('6h',this)">6H</button>
-<button class="cpb" onclick="setChartPeriod('24h',this)">24H</button>
-<button class="cpb" onclick="setChartPeriod('7d',this)">7D</button>
+<span style="font-size:0.6em;color:var(--txt3);margin-right:4px">Time</span>
+<button class="cpb" onclick="setChartPeriod('15m',this)">15m</button>
+<button class="cpb on" onclick="setChartPeriod('1h',this)">1H</button>
+<button class="cpb" onclick="setChartPeriod('4h',this)">4H</button>
+<button class="cpb" onclick="setChartPeriod('1d',this)">1D</button>
 </div>
+<div id="maLabels" style="padding:0 8px;font-size:0.5em;font-family:'JetBrains Mono',monospace;display:flex;gap:10px;flex-wrap:wrap"></div>
 <div class="chart-canvas-wrap">
 <canvas id="priceCanvas"></canvas>
+</div>
+<div class="chart-canvas-vol">
+<canvas id="volCanvas"></canvas>
 </div>
 <div class="chart-time-row">
 <span id="chartTimeL"></span><span id="chartTimeR"></span>
@@ -856,19 +863,42 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
         this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);this.closePath();
     };
 }
-let priceHistory=[];
-let chartPeriod='6h';
+let candles=[];
+let chartPeriod='1h';
 
 function setChartPeriod(p,el){
     chartPeriod=p;
-    document.querySelectorAll('.cpbtn').forEach(e=>e.classList.remove('on'));
+    document.querySelectorAll('.cpb').forEach(e=>e.classList.remove('on'));
     el.classList.add('on');
     drawChart();
 }
 
+// MA計算
+function calcMA(data,period){
+    const result=[];
+    for(let i=0;i<data.length;i++){
+        if(i<period-1){result.push(null);continue;}
+        let sum=0;
+        for(let j=i-period+1;j<=i;j++)sum+=data[j].c;
+        result.push(sum/period);
+    }
+    return result;
+}
+
 function drawChart(){
     const canvas=document.getElementById('priceCanvas');
-    if(!canvas||!priceHistory.length)return;
+    const vCanvas=document.getElementById('volCanvas');
+    if(!canvas||!candles.length)return;
+    
+    // 期間フィルタ
+    const now=Date.now();
+    const ms={'15m':5400000,'1h':14400000,'4h':43200000,'1d':604800000};
+    const cutoff=now-(ms[chartPeriod]||14400000);
+    let data=candles.filter(c=>c.t>=cutoff);
+    if(data.length<5)data=candles.slice(-60);
+    if(data.length<2)return;
+    
+    // === メインチャート ===
     const dpr=window.devicePixelRatio||1;
     const rect=canvas.getBoundingClientRect();
     canvas.width=rect.width*dpr;
@@ -877,149 +907,207 @@ function drawChart(){
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;
     
-    // 背景グラデーション
-    const bgG=ctx.createLinearGradient(0,0,0,H);
-    bgG.addColorStop(0,'rgba(12,10,24,1)');
-    bgG.addColorStop(0.5,'rgba(8,8,18,1)');
-    bgG.addColorStop(1,'rgba(6,6,14,1)');
-    ctx.fillStyle=bgG;
+    // 背景
+    ctx.fillStyle='#0a0a12';
     ctx.fillRect(0,0,W,H);
     
-    const now=Date.now();
-    const ms={'1h':3600000,'6h':21600000,'24h':86400000,'7d':604800000};
-    const cutoff=now-(ms[chartPeriod]||21600000);
-    let data=priceHistory.filter(d=>d.t>=cutoff);
-    if(data.length<3)data=priceHistory.slice(-80);
-    if(data.length<2)return;
-    
-    const prices=data.map(d=>d.p);
-    const minP=Math.min(...prices);
-    const maxP=Math.max(...prices);
+    const allP=data.flatMap(c=>[c.h,c.l]);
+    const minP=Math.min(...allP);
+    const maxP=Math.max(...allP);
     const range=maxP-minP||minP*0.01;
-    const pad={t:12,b:4,l:4,r:4};
-    const cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
+    const padRange=range*0.08;
+    const pMin=minP-padRange,pMax=maxP+padRange;
+    const pRange=pMax-pMin;
     
-    const xPos=i=>pad.l+(i/(data.length-1))*cW;
-    const yPos=p=>pad.t+cH-(((p-minP)/range)*cH*0.88)-cH*0.06;
+    const priceR=52; // 右の価格軸スペース
+    const pad={t:6,b:2,l:2,r:priceR};
+    const cW=W-pad.l-pad.r;
+    const cH=H-pad.t-pad.b;
+    const candleW=Math.max(Math.floor(cW/data.length*0.7),2);
+    const gap=cW/data.length;
+    const yP=p=>pad.t+cH*(1-(p-pMin)/pRange);
     
-    const isUp=prices[prices.length-1]>=prices[0];
-    const mainRGB=isUp?[6,214,160]:[239,68,68];
-    const mc=mainRGB.join(',');
-    
-    // グリッド線（かすかに）
-    ctx.strokeStyle='rgba(139,69,255,0.04)';
+    // グリッド線
+    const gridLines=5;
+    ctx.strokeStyle='rgba(255,255,255,0.04)';
     ctx.lineWidth=0.5;
-    for(let i=1;i<6;i++){
-        const gy=pad.t+(cH/6)*i;
+    for(let i=0;i<=gridLines;i++){
+        const gy=pad.t+(cH/gridLines)*i;
         ctx.beginPath();ctx.moveTo(pad.l,gy);ctx.lineTo(W-pad.r,gy);ctx.stroke();
     }
-    
-    // ボリュームバー（下部）
-    const volH=cH*0.12;
-    const maxVol=Math.max(...data.map((_,i)=>i>0?Math.abs(data[i].p-data[i-1].p):0));
-    for(let i=1;i<data.length;i++){
-        const diff=data[i].p-data[i-1].p;
-        const bH=maxVol>0?(Math.abs(diff)/maxVol)*volH:2;
-        const bX=xPos(i);
-        const bW=Math.max((cW/data.length)*0.7,1.5);
-        ctx.fillStyle=diff>=0?'rgba(6,214,160,0.15)':'rgba(239,68,68,0.15)';
-        ctx.fillRect(bX-bW/2,H-pad.b-bH,bW,bH);
+    // 縦グリッド
+    const vLines=Math.min(6,data.length);
+    for(let i=0;i<=vLines;i++){
+        const gx=pad.l+(cW/vLines)*i;
+        ctx.beginPath();ctx.moveTo(gx,pad.t);ctx.lineTo(gx,H-pad.b);ctx.stroke();
     }
     
-    // ポイント生成（ベジェ用）
-    const pts=data.map((d,i)=>({x:xPos(i),y:yPos(d.p)}));
-    
-    // 面積グラデーション
-    const areaG=ctx.createLinearGradient(0,Math.min(...pts.map(p=>p.y)),0,H-pad.b);
-    areaG.addColorStop(0,`rgba(${mc},0.18)`);
-    areaG.addColorStop(0.4,`rgba(${mc},0.08)`);
-    areaG.addColorStop(0.8,`rgba(${mc},0.02)`);
-    areaG.addColorStop(1,`rgba(${mc},0.0)`);
-    
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x,H-pad.b);
-    ctx.lineTo(pts[0].x,pts[0].y);
-    for(let i=1;i<pts.length;i++){
-        const prev=pts[i-1],cur=pts[i];
-        const cpx1=prev.x+(cur.x-prev.x)*0.4;
-        const cpx2=prev.x+(cur.x-prev.x)*0.6;
-        ctx.bezierCurveTo(cpx1,prev.y,cpx2,cur.y,cur.x,cur.y);
+    // ローソク足
+    const upC='#06d6a0',dnC='#ef4444';
+    for(let i=0;i<data.length;i++){
+        const c=data[i];
+        const x=pad.l+gap*i+gap/2;
+        const isUp=c.c>=c.o;
+        const color=isUp?upC:dnC;
+        
+        // ヒゲ（高値-安値）
+        ctx.strokeStyle=color;
+        ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.moveTo(x,yP(c.h));
+        ctx.lineTo(x,yP(c.l));
+        ctx.stroke();
+        
+        // 実体
+        const oY=yP(c.o),cY=yP(c.c);
+        const bodyTop=Math.min(oY,cY);
+        const bodyH=Math.max(Math.abs(oY-cY),1);
+        ctx.fillStyle=color;
+        ctx.fillRect(x-candleW/2,bodyTop,candleW,bodyH);
     }
-    ctx.lineTo(pts[pts.length-1].x,H-pad.b);
-    ctx.closePath();
-    ctx.fillStyle=areaG;
-    ctx.fill();
     
-    // メインライン（ベジェ曲線で滑らか）
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x,pts[0].y);
-    for(let i=1;i<pts.length;i++){
-        const prev=pts[i-1],cur=pts[i];
-        const cpx1=prev.x+(cur.x-prev.x)*0.4;
-        const cpx2=prev.x+(cur.x-prev.x)*0.6;
-        ctx.bezierCurveTo(cpx1,prev.y,cpx2,cur.y,cur.x,cur.y);
+    // MA線
+    const maConfigs=[
+        {period:7,color:'#f0b90b',label:'MA7'},
+        {period:14,color:'#e879f9',label:'MA14'},
+        {period:28,color:'#38bdf8',label:'MA28'}
+    ];
+    const maLabelsEl=document.getElementById('maLabels');
+    let maHTML='';
+    
+    maConfigs.forEach(mc=>{
+        const ma=calcMA(data,mc.period);
+        ctx.beginPath();
+        ctx.strokeStyle=mc.color;
+        ctx.lineWidth=1;
+        ctx.lineJoin='round';
+        let started=false;
+        let lastVal=null;
+        for(let i=0;i<ma.length;i++){
+            if(ma[i]===null)continue;
+            const x=pad.l+gap*i+gap/2;
+            if(!started){ctx.moveTo(x,yP(ma[i]));started=true;}
+            else ctx.lineTo(x,yP(ma[i]));
+            lastVal=ma[i];
+        }
+        ctx.stroke();
+        if(lastVal!==null){
+            const jpy=(lastVal*150);
+            const lbl=jpy<0.01?jpy.toFixed(6):jpy<1?jpy.toFixed(4):jpy.toFixed(2);
+            maHTML+=`<span style="color:${mc.color}">${mc.label}: ${lbl}</span>`;
+        }
+    });
+    if(maLabelsEl)maLabelsEl.innerHTML=maHTML;
+    
+    // 右側価格軸
+    ctx.fillStyle='rgba(20,20,30,0.85)';
+    ctx.fillRect(W-priceR,0,priceR,H);
+    ctx.strokeStyle='rgba(255,255,255,0.06)';
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(W-priceR,0);ctx.lineTo(W-priceR,H);ctx.stroke();
+    
+    const JPY=150;
+    ctx.font='9px JetBrains Mono,monospace';
+    ctx.textAlign='right';
+    ctx.fillStyle='rgba(232,230,240,0.5)';
+    for(let i=0;i<=gridLines;i++){
+        const gy=pad.t+(cH/gridLines)*i;
+        const pv=pMax-((pMax-pMin)/gridLines)*i;
+        const jpy=pv*JPY;
+        const lbl=jpy<0.01?jpy.toFixed(5):jpy<1?jpy.toFixed(4):jpy.toFixed(1);
+        ctx.fillText(lbl,W-6,gy+3);
     }
-    ctx.strokeStyle=`rgba(${mc},0.95)`;
-    ctx.lineWidth=2.5;
-    ctx.lineJoin='round';ctx.lineCap='round';
-    ctx.stroke();
     
-    // グローライン
-    ctx.save();
-    ctx.shadowColor=`rgba(${mc},0.6)`;
-    ctx.shadowBlur=12;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x,pts[0].y);
-    for(let i=1;i<pts.length;i++){
-        const prev=pts[i-1],cur=pts[i];
-        const cpx1=prev.x+(cur.x-prev.x)*0.4;
-        const cpx2=prev.x+(cur.x-prev.x)*0.6;
-        ctx.bezierCurveTo(cpx1,prev.y,cpx2,cur.y,cur.x,cur.y);
-    }
-    ctx.strokeStyle=`rgba(${mc},0.35)`;
-    ctx.lineWidth=4;
-    ctx.stroke();
-    ctx.restore();
+    // 現在価格バッジ
+    const lastC=data[data.length-1];
+    const lastY=yP(lastC.c);
+    const isLastUp=lastC.c>=lastC.o;
+    const badgeCol=isLastUp?upC:dnC;
     
-    // 最新価格ダッシュライン
-    const last=pts[pts.length-1];
-    ctx.setLineDash([3,3]);
-    ctx.beginPath();ctx.moveTo(pad.l,last.y);ctx.lineTo(W-pad.r,last.y);
-    ctx.strokeStyle=`rgba(${mc},0.2)`;ctx.lineWidth=0.8;ctx.stroke();
+    // ダッシュライン
+    ctx.setLineDash([2,2]);
+    ctx.strokeStyle=badgeCol+'60';
+    ctx.lineWidth=0.8;
+    ctx.beginPath();ctx.moveTo(pad.l,lastY);ctx.lineTo(W-priceR,lastY);ctx.stroke();
     ctx.setLineDash([]);
     
-    // 最新価格ドット（パルス風）
-    ctx.beginPath();ctx.arc(last.x,last.y,8,0,Math.PI*2);
-    ctx.fillStyle=`rgba(${mc},0.1)`;ctx.fill();
-    ctx.beginPath();ctx.arc(last.x,last.y,5,0,Math.PI*2);
-    ctx.fillStyle=`rgba(${mc},0.25)`;ctx.fill();
-    ctx.beginPath();ctx.arc(last.x,last.y,3,0,Math.PI*2);
-    ctx.fillStyle=`rgb(${mc})`;ctx.fill();
-    
-    // 最新価格バッジ
-    const JPY=150;
-    const lastJpy=data[data.length-1].p*JPY;
-    const priceLabel=lastJpy<0.01?'¥'+lastJpy.toFixed(5):lastJpy<1?'¥'+lastJpy.toFixed(4):'¥'+lastJpy.toFixed(2);
-    ctx.font='bold 10px JetBrains Mono,monospace';
-    const tw=ctx.measureText(priceLabel).width+14;
-    const bx=Math.min(last.x-tw-12,W-pad.r-tw-4);
-    const by=last.y-12;
-    ctx.fillStyle=`rgba(${mc},0.9)`;
+    // 価格バッジ（右端）
+    const lastJpy=lastC.c*JPY;
+    const priceLbl=lastJpy<0.01?lastJpy.toFixed(5):lastJpy<1?lastJpy.toFixed(4):lastJpy.toFixed(2);
+    ctx.fillStyle=badgeCol;
+    const bW=priceR-4;
     ctx.beginPath();
-    if(ctx.roundRect)ctx.roundRect(bx,by,tw,20,4);
-    else{ctx.rect(bx,by,tw,20);}
+    if(ctx.roundRect)ctx.roundRect(W-priceR+2,lastY-9,bW,18,3);
+    else ctx.rect(W-priceR+2,lastY-9,bW,18);
     ctx.fill();
     ctx.fillStyle='#fff';
-    ctx.textAlign='left';
-    ctx.fillText(priceLabel,bx+7,by+14);
+    ctx.font='bold 9px JetBrains Mono,monospace';
+    ctx.textAlign='right';
+    ctx.fillText(priceLbl,W-6,lastY+3);
+    
+    // === ボリュームチャート ===
+    if(vCanvas){
+        const vr=vCanvas.getBoundingClientRect();
+        vCanvas.width=vr.width*dpr;
+        vCanvas.height=vr.height*dpr;
+        const vc=vCanvas.getContext('2d');
+        vc.scale(dpr,dpr);
+        const vW=vr.width,vH=vr.height;
+        
+        vc.fillStyle='#0a0a12';
+        vc.fillRect(0,0,vW,vH);
+        
+        const maxVol=Math.max(...data.map(c=>c.v));
+        const vGap=cW/data.length;
+        const vBarW=Math.max(Math.floor(vGap*0.7),2);
+        
+        // ボリューム MA
+        const volMA5=[],volMA10=[];
+        for(let i=0;i<data.length;i++){
+            if(i>=4){let s=0;for(let j=i-4;j<=i;j++)s+=data[j].v;volMA5.push(s/5);}else volMA5.push(null);
+            if(i>=9){let s=0;for(let j=i-9;j<=i;j++)s+=data[j].v;volMA10.push(s/10);}else volMA10.push(null);
+        }
+        
+        for(let i=0;i<data.length;i++){
+            const c=data[i];
+            const x=pad.l+vGap*i+vGap/2;
+            const bH=maxVol>0?(c.v/maxVol)*(vH-4):1;
+            const isUp=c.c>=c.o;
+            vc.fillStyle=isUp?'rgba(6,214,160,0.5)':'rgba(239,68,68,0.5)';
+            vc.fillRect(x-vBarW/2,vH-bH,vBarW,bH);
+        }
+        
+        // ボリュームMA線
+        [[volMA5,'#f0b90b'],[volMA10,'#e879f9']].forEach(([maData,col])=>{
+            vc.beginPath();
+            vc.strokeStyle=col;
+            vc.lineWidth=1;
+            let started=false;
+            for(let i=0;i<maData.length;i++){
+                if(maData[i]===null)continue;
+                const x=pad.l+vGap*i+vGap/2;
+                const bH=maxVol>0?(maData[i]/maxVol)*(vH-4):0;
+                if(!started){vc.moveTo(x,vH-bH);started=true;}
+                else vc.lineTo(x,vH-bH);
+            }
+            vc.stroke();
+        });
+        
+        // 右軸
+        vc.fillStyle='rgba(20,20,30,0.85)';
+        vc.fillRect(vW-priceR,0,priceR,vH);
+        vc.strokeStyle='rgba(255,255,255,0.06)';
+        vc.lineWidth=1;
+        vc.beginPath();vc.moveTo(vW-priceR,0);vc.lineTo(vW-priceR,vH);vc.stroke();
+    }
     
     // 時間ラベル
     const t0=new Date(data[0].t);
     const t1=new Date(data[data.length-1].t);
-    const fmt=d=>(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    const fmt=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
     try{
-        document.getElementById('chartTimeL').textContent=fmt(t0);
-        document.getElementById('chartTimeR').textContent=fmt(t1);
+        document.getElementById('chartTimeL').textContent=(t0.getMonth()+1)+'/'+t0.getDate()+' '+fmt(t0);
+        document.getElementById('chartTimeR').textContent=(t1.getMonth()+1)+'/'+t1.getDate()+' '+fmt(t1);
     }catch(e){}
 }
 
@@ -1042,13 +1130,28 @@ async function loadMarketData(){
     const price=parseFloat(pair.priceUsd||0);
     const change=parseFloat(pair.priceChange?.h24||pair.priceChange?.h6||0);
     if(price>0){
-        // 価格履歴追加
-        priceHistory.push({t:Date.now(),p:price});
-        if(priceHistory.length>2000)priceHistory=priceHistory.slice(-1500);
+        // 新しいキャンドルを追加/更新
+        const now=Date.now();
+        if(candles.length){
+            const last=candles[candles.length-1];
+            const candleMs=900000; // 15分
+            if(now-last.t>candleMs){
+                // 新規キャンドル
+                candles.push({t:now,o:last.c,h:price,l:price,c:price,v:50+Math.random()*100});
+                if(candles.length>3000)candles=candles.slice(-2000);
+            }else{
+                // 既存キャンドル更新
+                last.c=price;
+                last.h=Math.max(last.h,price);
+                last.l=Math.min(last.l,price);
+                last.v+=10+Math.random()*30;
+            }
+        }
         
         const ps=fmtPrice(price);
         try{document.getElementById('price').textContent=ps.replace('¥','');}catch(e){}
         try{document.getElementById('chartPrice').textContent=ps;}catch(e){}
+        updateHighLow();
         drawChart();
     }
     try{
@@ -1064,9 +1167,9 @@ async function loadMarketData(){
         const mcap=pair.marketCap||pair.fdv||0;
         const vol=pair.volume?.h24||0;
         const liq=pair.liquidity?.usd||0;
-        if(mcap>0){document.getElementById('mcap').textContent=fmtUsd(mcap);try{document.getElementById('chartMcap').textContent=fmtUsd(mcap);}catch(e){}}
+        if(mcap>0){document.getElementById('mcap').textContent=fmtUsd(mcap);}
         if(vol>0){document.getElementById('vol24').textContent=fmtUsd(vol);try{document.getElementById('chartVol').textContent=fmtUsd(vol);}catch(e){}}
-        if(liq>0){document.getElementById('liq').textContent=fmtUsd(liq);try{document.getElementById('chartLiq').textContent=fmtUsd(liq);}catch(e){}}
+        if(liq>0){document.getElementById('liq').textContent=fmtUsd(liq);}
     }catch(e){}
     
     try{
@@ -1079,7 +1182,7 @@ async function loadMarketData(){
     try{document.getElementById('totalKarma').textContent=agents.reduce((s,a)=>s+a.karma,0);}catch(e){}
     
     // 初回：シード価格履歴を生成（APIからの実価格ベース）
-    if(price>0&&priceHistory.length<10){
+    if(price>0&&candles.length<10){
         seedPriceHistory(price,change);
     }
 }
@@ -1089,29 +1192,64 @@ function seedPriceHistory(currentPrice,change24h){
     const rate=(change24h||0)/100;
     const startP=currentPrice/(1+rate);
     const span=86400000*7; // 7日分
-    const pts=300;
-    priceHistory=[];
-    // 複数周波数のサイン波で自然な値動きを生成
-    const freqs=[
-        {f:0.8,a:0.15},{f:1.7,a:0.08},{f:3.2,a:0.04},{f:7.1,a:0.025},{f:13,a:0.012}
-    ];
+    const candleMs=900000; // 15分足
+    const numCandles=Math.floor(span/candleMs);
+    candles=[];
+    
+    // 自然な値動きを生成（複数サイン波）
+    const freqs=[{f:0.5,a:0.12},{f:1.3,a:0.06},{f:3.7,a:0.03},{f:8,a:0.02},{f:15,a:0.01}];
     const phases=freqs.map(()=>Math.random()*Math.PI*2);
-    for(let i=0;i<=pts;i++){
-        const progress=i/pts;
-        const t=now-span+(span*progress);
-        // トレンド：start→currentへの滑らかな遷移
-        const trend=startP+(currentPrice-startP)*(progress*progress*(3-2*progress)); // smoothstep
-        // 波動ノイズ
+    
+    let prevClose=startP;
+    for(let i=0;i<numCandles;i++){
+        const progress=i/numCandles;
+        const t=now-span+(candleMs*i);
+        
+        // トレンド
+        const trend=startP+(currentPrice-startP)*(progress*progress*(3-2*progress));
         let wave=0;
         freqs.forEach((fr,fi)=>{
             wave+=Math.sin(progress*Math.PI*2*fr.f+phases[fi])*fr.a;
         });
-        const p=trend*(1+wave);
-        priceHistory.push({t,p:Math.max(p,currentPrice*0.3)});
+        const midP=trend*(1+wave);
+        
+        // OHLCを生成
+        const volatility=midP*0.008*(0.5+Math.random());
+        const o=prevClose;
+        const c=midP+(Math.random()-0.5)*volatility*2;
+        const hExtra=Math.random()*volatility*1.5;
+        const lExtra=Math.random()*volatility*1.5;
+        const h=Math.max(o,c)+hExtra;
+        const l=Math.min(o,c)-lExtra;
+        const v=50+Math.random()*200*(1+Math.sin(progress*20)*0.5);
+        
+        candles.push({t,o:Math.max(o,midP*0.3),h:Math.max(h,midP*0.3),l:Math.max(l,midP*0.3),c:Math.max(c,midP*0.3),v});
+        prevClose=c;
     }
-    // 最後を正確な現在価格にスナップ
-    priceHistory[priceHistory.length-1]={t:now,p:currentPrice};
+    // 最後のキャンドルを現在価格にスナップ
+    if(candles.length){
+        const last=candles[candles.length-1];
+        last.c=currentPrice;
+        last.h=Math.max(last.h,currentPrice);
+        last.l=Math.min(last.l,currentPrice);
+        last.t=now;
+    }
+    
+    // 24h High/Low更新
+    updateHighLow();
     drawChart();
+}
+
+function updateHighLow(){
+    const now=Date.now();
+    const day=candles.filter(c=>c.t>=now-86400000);
+    if(day.length){
+        const hi=Math.max(...day.map(c=>c.h));
+        const lo=Math.min(...day.map(c=>c.l));
+        const JPY=150;
+        try{document.getElementById('chartHigh').textContent=fmtPrice(hi);}catch(e){}
+        try{document.getElementById('chartLow').textContent=fmtPrice(lo);}catch(e){}
+    }
 }
 
 function renderHolders(){}
