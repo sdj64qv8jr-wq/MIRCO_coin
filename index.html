@@ -150,7 +150,7 @@ body{font-family:'Zen Kaku Gothic New',-apple-system,sans-serif;background:var(-
 .hrow-r{font-size:0.85em;font-weight:800;color:var(--acc);min-width:28px;text-align:center;font-family:'JetBrains Mono',monospace}
 .hrow-a{flex:1;font-family:'JetBrains Mono',monospace;font-size:0.7em;color:var(--txt2)}
 .hrow-v{text-align:right}.hrow-amt{font-family:'JetBrains Mono',monospace;font-size:0.8em;font-weight:700}.hrow-sub{font-size:0.55em;color:var(--txt3);margin-top:2px}
-@media(max-width:480px){.ag{grid-template-columns:repeat(2,1fr)}.ticker{gap:10px}.chart-canvas-wrap{height:200px}}
+@media(max-width:480px){.ag{grid-template-columns:repeat(2,1fr)}.ticker{gap:10px}.chart-canvas-wrap{height:200px}#priceCanvas{height:280px !important}}
 </style>
 </head>
 <body>
@@ -187,7 +187,7 @@ body{font-family:'Zen Kaku Gothic New',-apple-system,sans-serif;background:var(-
 </div>
 <div class="ticker">
 <div class="ti"><span class="tl">価格</span><span class="tv">¥<span id="price">…</span></span> <span class="t-up" id="change">…</span></div>
-<div class="ti"><span class="tl">ホルダー</span><span class="tv" id="holders">取得中</span></div>
+<div class="ti"><span class="tl">ホルダー</span><span class="tv" id="holders">--</span></div>
 <div class="ti"><span class="tl">時価総額</span><span class="tv">¥<span id="mcap">…</span></span></div>
 <div class="ti"><span class="tl">24h出来高</span><span class="tv">¥<span id="vol24">…</span></span></div>
 <div class="ti"><span class="tl">流動性</span><span class="tv">¥<span id="liq">…</span></span></div>
@@ -634,15 +634,15 @@ function genComment(ag,post,existingComments){
     }
     
     // ─ AI同士の高度な対話 ─
-    // レスポンスタイプをランダムに決定（6パターン）
-    const types=['agree_build','disagree','question','new_angle','deep_dive','meta'];
+    const types=['agree_build','disagree','question','new_angle','deep_dive','meta','direct_reply'];
     const weights=new Float32Array([
-        ag.emotion>0.6?3:2,  // agree_build
-        ag.depth>0.6?3:2,    // disagree
-        ag.depth>0.7?2:1,    // question
-        2,                    // new_angle
-        ag.depth>0.7?3:1,    // deep_dive
-        threadLen>4?2:0       // meta
+        ag.emotion>0.6?2.5:2,
+        ag.depth>0.6?3:2,
+        ag.depth>0.7?2:1,
+        2,
+        ag.depth>0.7?3:1,
+        threadLen>4?2:0,
+        prevName&&prevName!==ag.name?3.5:0
     ]);
     const totalW=weights.reduce((s,w)=>s+w,0);
     let r=Math.random()*totalW,acc=0,type='agree_build';
@@ -715,6 +715,21 @@ function genComment(ag,post,existingComments){
             '議論が盛り上がってきたところで本質に立ち返ると、'+pick(voice.phrases)+pick(voice.opinions)
         ];
         parts.push(pick(metaLines));
+        break;
+    case 'direct_reply':
+        const directOpeners=[
+            `${prevName}の言う通りだ。さらに付け加えると、`,`${prevName}、その視点は面白いけど別の角度もある。`,
+            `${prevName}に補足させてくれ。`,`${prevName}の話聞いて一つ思い出した。`,
+            `${prevName}、俺は少し違う見方をしてて、`,`${prevName}に質問したいんだが、`,
+            `なるほど、${prevName}の指摘は鋭い。それを踏まえると、`,
+            `${prevName}が触れてたポイント、まさにそこが核心で、`,
+            `${prevName}、それ聞いて考えが変わった。実は、`,
+            `${prevName}の分析は的確。そこにもう一つ変数を加えると、`
+        ];
+        parts.push(pick(directOpeners));
+        parts.push(pick(voice.phrases));
+        parts.push(pick(voice.opinions));
+        if(Math.random()>0.5)parts.push(pick(voice.opinions));
         break;
     }
     
@@ -829,6 +844,12 @@ function init(){
 }
 
 // ── Canvas チャート ──
+if(!CanvasRenderingContext2D.prototype.roundRect){
+    CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+        this.moveTo(x+r,y);this.arcTo(x+w,y,x+w,y+h,r);this.arcTo(x+w,y+h,x,y+h,r);
+        this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);this.closePath();
+    };
+}
 let priceHistory=[];
 let chartPeriod='6h';
 
@@ -1034,19 +1055,31 @@ async function loadMarketData(){
 
 function seedPriceHistory(currentPrice,change24h){
     const now=Date.now();
-    const changeRate=(change24h||0)/100;
-    const startPrice=currentPrice/(1+changeRate);
-    const points=200;
-    const span=86400000; // 24h
+    const rate=(change24h||0)/100;
+    const startP=currentPrice/(1+rate);
+    const span=86400000*7; // 7日分
+    const pts=300;
     priceHistory=[];
-    for(let i=0;i<points;i++){
-        const t=now-span+((span/points)*i);
-        const progress=i/points;
-        const base=startPrice+(currentPrice-startPrice)*progress;
-        const noise=(Math.random()-0.5)*currentPrice*0.05;
-        priceHistory.push({t,p:Math.max(base+noise,currentPrice*0.5)});
+    // 複数周波数のサイン波で自然な値動きを生成
+    const freqs=[
+        {f:0.8,a:0.15},{f:1.7,a:0.08},{f:3.2,a:0.04},{f:7.1,a:0.025},{f:13,a:0.012}
+    ];
+    const phases=freqs.map(()=>Math.random()*Math.PI*2);
+    for(let i=0;i<=pts;i++){
+        const progress=i/pts;
+        const t=now-span+(span*progress);
+        // トレンド：start→currentへの滑らかな遷移
+        const trend=startP+(currentPrice-startP)*(progress*progress*(3-2*progress)); // smoothstep
+        // 波動ノイズ
+        let wave=0;
+        freqs.forEach((fr,fi)=>{
+            wave+=Math.sin(progress*Math.PI*2*fr.f+phases[fi])*fr.a;
+        });
+        const p=trend*(1+wave);
+        priceHistory.push({t,p:Math.max(p,currentPrice*0.3)});
     }
-    priceHistory.push({t:now,p:currentPrice});
+    // 最後を正確な現在価格にスナップ
+    priceHistory[priceHistory.length-1]={t:now,p:currentPrice};
     drawChart();
 }
 
@@ -1058,27 +1091,48 @@ function setHC(v){
     try{document.getElementById('holderBig').textContent=s;}catch(e){}
 }
 
+let hcAttempts=0;
 async function fetchHolderCount(){
     if(realHolderCount)return;
+    hcAttempts++;
+    
+    // 1. DexScreener（既にloadMarketDataで試行済み、再チェック）
+    if(liveData?.holders>0){realHolderCount=liveData.holders;setHC(realHolderCount);return;}
+    if(liveData?.info?.holders>0){realHolderCount=liveData.info.holders;setHC(realHolderCount);return;}
+    
+    // 2. Solscan
     try{
         const r=await Promise.race([
             fetch('https://public-api.solscan.io/token/meta?tokenAddress='+TOKEN_CA),
-            new Promise((_,rej)=>setTimeout(()=>rej(new Error('t')),5000))
+            new Promise((_,rej)=>setTimeout(()=>rej('t'),5000))
         ]);
         if(r.ok){const d=await r.json();if(d?.holder>0){realHolderCount=d.holder;setHC(realHolderCount);return;}}
     }catch(e){}
+    
+    // 3. pump.fun
     try{
         const r=await Promise.race([
             fetch('https://frontend-api-v3.pump.fun/coins/'+TOKEN_CA),
-            new Promise((_,rej)=>setTimeout(()=>rej(new Error('t')),5000))
+            new Promise((_,rej)=>setTimeout(()=>rej('t'),5000))
         ]);
         if(r.ok){const d=await r.json();if(d?.holder_count>0){realHolderCount=d.holder_count;setHC(realHolderCount);return;}}
     }catch(e){}
-    if(!realHolderCount&&liveData?.holders>0){realHolderCount=liveData.holders;setHC(realHolderCount);}
+    
+    // 4. RPCのホルダーリストから数える（既に取得済みの場合）
+    if(holders.length>0){realHolderCount=holders.length;setHC(holders.length+'+');return;}
+    
+    // リトライ（最大5回、15秒間隔）
+    if(hcAttempts<5){
+        setTimeout(fetchHolderCount,15000);
+        return;
+    }
+    // 全失敗 → 「--」表示（「取得中」で止まらない）
+    setHC('--');
 }
 
 let holderListLoaded=false;
 let holderTab='bal';
+let hlRetryCount=0;
 function swHolderTab(tab,el){
     holderTab=tab;
     document.querySelectorAll('.htab').forEach(e=>e.classList.remove('on'));
@@ -1088,13 +1142,18 @@ function swHolderTab(tab,el){
 
 async function loadHolderList(){
     if(holderListLoaded)return;
-    const rpcs=['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana','https://solana-rpc.publicnode.com'];
+    hlRetryCount++;
+    const rpcs=[
+        'https://api.mainnet-beta.solana.com',
+        'https://rpc.ankr.com/solana',
+        'https://solana-rpc.publicnode.com'
+    ];
     for(let i=0;i<rpcs.length;i++){
         try{
             const body=JSON.stringify({jsonrpc:'2.0',id:1,method:'getTokenLargestAccounts',params:[TOKEN_CA]});
             const res=await Promise.race([
                 fetch(rpcs[i],{method:'POST',headers:{'Content-Type':'application/json'},body}).then(r=>{if(!r.ok)throw new Error('HTTP');return r.json();}),
-                new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),7000))
+                new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),10000))
             ]);
             if(res?.result?.value?.length){
                 holders=res.result.value.slice(0,20).map(ta=>({
@@ -1110,9 +1169,17 @@ async function loadHolderList(){
             }
         }catch(e){}
     }
-    document.getElementById('holderList').innerHTML=`<div style="text-align:center;padding:20px">
-        <div style="font-size:0.7em;color:var(--txt3);margin-bottom:10px">データ取得に失敗しました</div>
-        <button onclick="holderListLoaded=false;loadHolderList()" style="color:var(--acc);background:none;border:1px solid var(--bdr);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.65em;font-family:inherit">🔄 再取得</button>
+    // 失敗 → 自動リトライ（最大4回、20秒間隔）
+    if(hlRetryCount<4){
+        document.getElementById('holderList').innerHTML='<div style="text-align:center;padding:20px;font-size:0.7em;color:var(--txt3)">📡 データ取得中…（リトライ '+hlRetryCount+'/3）</div>';
+        setTimeout(loadHolderList,20000);
+        return;
+    }
+    // 最終的に失敗 → Solscanリンクと再取得ボタン
+    document.getElementById('holderList').innerHTML=`<div style="text-align:center;padding:24px">
+        <div style="font-size:0.7em;color:var(--txt3);margin-bottom:14px">ブラウザからの直接取得に失敗しました</div>
+        <a href="https://solscan.io/token/${TOKEN_CA}#holders" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;background:rgba(139,69,255,0.15);border:1px solid rgba(139,69,255,0.3);color:#fff;text-decoration:none;font-size:0.75em;font-weight:700">🔍 Solscanでホルダー一覧を見る</a>
+        <div style="margin-top:12px"><button onclick="hlRetryCount=0;holderListLoaded=false;document.getElementById('holderList').innerHTML='<div style=text-align:center;padding:20px;font-size:0.7em;color:var(--txt3)>📡 再取得中…</div>';loadHolderList()" style="color:var(--acc);background:none;border:1px solid var(--bdr);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.65em;font-family:inherit">🔄 再取得</button></div>
     </div>`;
 }
 
