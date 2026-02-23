@@ -103,25 +103,30 @@ body{font-family:'Zen Kaku Gothic New',-apple-system,sans-serif;background:var(-
 .mtit{font-size:0.9em;font-weight:900;color:var(--acc);margin-bottom:14px;text-align:center}
 .minp{width:100%;padding:10px;background:rgba(0,0,0,0.4);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:0.75em;margin-bottom:12px;outline:none}.minp:focus{border-color:var(--acc)}
 .mbts{display:flex;gap:8px}.mbt{flex:1;padding:10px;border-radius:6px;font-size:0.75em;font-weight:700;cursor:pointer;transition:all 0.2s;border:1px solid var(--bdr)}.mbt.pr{background:linear-gradient(135deg,var(--acc),var(--pink));color:#fff;border:none}.mbt.gh{background:none;color:var(--txt2)}
-.chart-wrap{background:linear-gradient(180deg,rgba(16,16,28,0.95),rgba(10,10,18,0.98));border:1px solid var(--bdr);border-radius:10px;overflow:hidden}
-.chart-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
-.chart-title{font-size:0.75em;font-weight:700;color:var(--acc)}
-.chart-price{font-size:1.1em;font-weight:900;font-family:'JetBrains Mono',monospace;color:var(--txt)}
-.chart-chg{font-size:0.65em;font-weight:600;margin-left:6px;padding:2px 6px;border-radius:4px}
-.chart-chg.t-up{background:rgba(6,214,160,0.12);color:var(--up)}
-.chart-chg.t-dn{background:rgba(239,68,68,0.12);color:var(--down)}
-.chart-canvas-wrap{position:relative;height:280px;padding:0 4px}
-.chart-canvas-wrap canvas{width:100%;height:100%;display:block}
-.chart-canvas-vol{position:relative;height:60px;padding:0 4px;border-top:1px solid rgba(139,69,255,0.06)}
-.chart-canvas-vol canvas{width:100%;height:100%;display:block}
-.chart-periods{display:flex;gap:4px;padding:6px 12px}
-.chart-per{padding:4px 10px;border-radius:4px;font-size:0.6em;font-weight:600;cursor:pointer;background:rgba(139,69,255,0.06);border:1px solid var(--bdr);color:var(--txt3);transition:all 0.2s;font-family:'JetBrains Mono',monospace}
-.chart-per.on{background:var(--acc);color:#fff;border-color:var(--acc)}
-.chart-per:hover{border-color:var(--acc)}
-.chart-info{display:flex;gap:12px;padding:4px 14px 8px;font-size:0.55em;color:var(--txt3);font-family:'JetBrains Mono',monospace}
-.chart-info span{color:var(--txt2);font-weight:600}
-.chart-links{display:flex;gap:8px;padding:8px 14px;border-top:1px solid var(--bdr)}
-.chart-link{font-size:0.55em;color:var(--acc);text-decoration:none;padding:3px 8px;background:rgba(139,69,255,0.08);border:1px solid var(--bdr);border-radius:4px;transition:all 0.2s}.chart-link:hover{background:rgba(139,69,255,0.2);border-color:var(--acc)}
+.chart-wrap{background:#0b0b14;border:1px solid var(--bdr);border-radius:10px;overflow:hidden}
+.cx-header{display:flex;align-items:center;gap:10px;padding:10px 12px 4px}
+.cx-pair{font-size:1.05em;font-weight:800;color:#fff;letter-spacing:0.02em}
+.cx-slash{color:var(--txt3);font-weight:400}
+.cx-price-wrap{margin-left:auto;text-align:right}
+.cx-price{font-size:1.3em;font-weight:900;font-family:'JetBrains Mono',monospace;color:var(--up);letter-spacing:-0.02em}
+.cx-sub{font-size:0.55em;color:var(--txt3);font-family:'JetBrains Mono',monospace}
+.cx-chg{font-size:0.7em;font-weight:700;padding:3px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;min-width:56px;text-align:center}
+.cx-chg.t-up{background:rgba(6,214,160,0.12);color:var(--up)}.cx-chg.t-dn{background:rgba(239,68,68,0.12);color:var(--down)}
+.cx-info{display:flex;justify-content:space-between;padding:6px 12px;gap:4px}
+.cx-inf{display:flex;flex-direction:column;gap:1px;flex:1}
+.cx-il{font-size:0.5em;color:var(--txt3)}.cx-iv{font-size:0.7em;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--txt)}
+.cx-periods{display:flex;align-items:center;gap:4px;padding:6px 12px;border-top:1px solid rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.04)}
+.cx-plbl{font-size:0.6em;color:var(--txt3);margin-right:4px}
+.cpb{padding:4px 10px;border-radius:3px;font-size:0.6em;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--txt3);transition:all 0.15s;font-family:'JetBrains Mono',monospace}
+.cpb.on{background:rgba(247,147,26,0.15);color:#f7931a;font-weight:800}.cpb:hover{color:var(--txt)}
+.cx-ema{padding:2px 12px;font-size:0.48em;font-family:'JetBrains Mono',monospace;display:flex;gap:8px;flex-wrap:wrap;line-height:1.6}
+.cx-chart{position:relative;height:300px;background:#0b0b14;touch-action:none}
+.cx-chart canvas{width:100%;height:100%;display:block}
+.cx-vol{height:65px;background:#0b0b14;border-top:1px solid rgba(255,255,255,0.03);touch-action:none}
+.cx-vol canvas{width:100%;height:100%;display:block}
+.cx-time{display:flex;justify-content:space-between;padding:4px 12px 4px 4px;font-size:0.48em;color:var(--txt3);font-family:'JetBrains Mono',monospace}
+.cx-links{display:flex;gap:6px;padding:6px 12px 10px}
+.cl-btn{font-size:0.55em;color:var(--txt3);text-decoration:none;padding:4px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:4px;transition:all 0.2s;font-family:inherit}.cl-btn:hover{color:var(--txt);border-color:rgba(255,255,255,0.12)}
 .hl-tabs{display:flex;gap:0;padding:0 12px 10px}
 .hl-tab{flex:1;padding:8px;text-align:center;font-size:0.7em;font-weight:700;cursor:pointer;border:1px solid var(--bdr);color:var(--txt3);transition:all 0.2s}
 .hl-tab:first-child{border-radius:8px 0 0 8px}.hl-tab:last-child{border-radius:0 8px 8px 0}
@@ -157,7 +162,7 @@ body{font-family:'Zen Kaku Gothic New',-apple-system,sans-serif;background:var(-
 .ref-icon{font-size:1.4em;min-width:32px;text-align:center}
 .ref-body{flex:1}.ref-name{font-size:0.8em;font-weight:700;margin-bottom:2px}.ref-desc{font-size:0.55em;color:var(--txt3)}
 .ref-arrow{font-size:0.9em;color:var(--acc);font-weight:700}
-@media(max-width:480px){.ag{grid-template-columns:repeat(2,1fr)}.ticker{gap:10px}.chart-canvas-wrap{height:240px}.chart-canvas-vol{height:50px}}
+@media(max-width:480px){.ag{grid-template-columns:repeat(2,1fr)}.ticker{gap:10px}.cx-chart{height:260px}.cx-vol{height:55px}}
 </style>
 </head>
 <body>
@@ -216,41 +221,38 @@ body{font-family:'Zen Kaku Gothic New',-apple-system,sans-serif;background:var(-
 </div>
 <div class="pnl" id="agentsPnl"><div class="stitle">🤖 エージェント一覧</div><div class="ag" id="agGrid"></div></div>
 <div class="pnl" id="chartPnl">
-<div class="chart-top">
-<div class="chart-pair"><span class="chart-sym">MIRCO</span><span class="chart-slash">/</span><span class="chart-base">SOL</span></div>
-<div class="chart-pblock">
-<span id="chartPrice" class="chart-price-big">--</span>
-<span id="chartChg" class="chart-chg-pill t-up"></span>
+<div class="cx-header">
+<div class="cx-pair">MIRCO<span class="cx-slash">/SOL</span></div>
+<div class="cx-price-wrap">
+<div id="chartPrice" class="cx-price">--</div>
+<div class="cx-sub">≈<span id="chartJpy">--</span> JPY</div>
 </div>
+<div id="chartChg" class="cx-chg t-up"></div>
 </div>
-<div class="chart-stats">
-<div class="cs-item"><div class="cs-l">24h High</div><div class="cs-v" id="chartHigh">--</div></div>
-<div class="cs-div"></div>
-<div class="cs-item"><div class="cs-l">24h Low</div><div class="cs-v" id="chartLow">--</div></div>
-<div class="cs-div"></div>
-<div class="cs-item"><div class="cs-l">Vol 24h</div><div class="cs-v" id="chartVol">--</div></div>
+<div class="cx-info">
+<div class="cx-inf"><span class="cx-il">24h High</span><span class="cx-iv" id="chartHigh">--</span></div>
+<div class="cx-inf"><span class="cx-il">24h Low</span><span class="cx-iv" id="chartLow">--</span></div>
+<div class="cx-inf"><span class="cx-il">24h Turnover</span><span class="cx-iv" id="chartVol">--</span></div>
 </div>
-<div class="chart-periods" id="chartPeriods">
-<span style="font-size:0.6em;color:var(--txt3);margin-right:4px">Time</span>
+<div class="cx-periods" id="chartPeriods">
+<span class="cx-plbl">Time</span>
 <button class="cpb" onclick="setChartPeriod('15m',this)">15m</button>
 <button class="cpb on" onclick="setChartPeriod('1h',this)">1H</button>
 <button class="cpb" onclick="setChartPeriod('4h',this)">4H</button>
 <button class="cpb" onclick="setChartPeriod('1d',this)">1D</button>
 </div>
-<div id="maLabels" style="padding:0 8px;font-size:0.5em;font-family:'JetBrains Mono',monospace;display:flex;gap:10px;flex-wrap:wrap"></div>
-<div class="chart-canvas-wrap">
+<div id="emaLabels" class="cx-ema"></div>
+<div class="cx-chart" id="chartArea">
 <canvas id="priceCanvas"></canvas>
 </div>
-<div class="chart-canvas-vol">
+<div class="cx-vol">
 <canvas id="volCanvas"></canvas>
 </div>
-<div class="chart-time-row">
-<span id="chartTimeL"></span><span id="chartTimeR"></span>
-</div>
-<div class="chart-links-row">
-<a href="https://dexscreener.com/solana/HGNjaczVcV6tKbpWCLarszbwtwB9hUd2Cd7ySbabpump" target="_blank" class="cl-btn">📊 DexScreener</a>
-<a href="https://pump.fun/coin/HGNjaczVcV6tKbpWCLarszbwtwB9hUd2Cd7ySbabpump" target="_blank" class="cl-btn">🚀 Pump.fun</a>
-<a href="https://solscan.io/token/HGNjaczVcV6tKbpWCLarszbwtwB9hUd2Cd7ySbabpump" target="_blank" class="cl-btn">⛓ Solscan</a>
+<div class="cx-time"><span id="chartTimeL"></span><span id="chartTimeR"></span></div>
+<div class="cx-links">
+<a href="https://dexscreener.com/solana/HGNjaczVcV6tKbpWCLarszbwtwB9hUd2Cd7ySbabpump" target="_blank" class="cl-btn">DexScreener</a>
+<a href="https://pump.fun/coin/HGNjaczVcV6tKbpWCLarszbwtwB9hUd2Cd7ySbabpump" target="_blank" class="cl-btn">Pump.fun</a>
+<a href="https://solscan.io/token/HGNjaczVcV6tKbpWCLarszbwtwB9hUd2Cd7ySbabpump" target="_blank" class="cl-btn">Solscan</a>
 </div>
 </div>
 <div class="pnl" id="holdersPnl"><div class="stitle">💎 ホルダー情報</div>
@@ -865,40 +867,82 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
 }
 let candles=[];
 let chartPeriod='1h';
+let chartZoom=1.0; // 1.0=default, <1=zoom out, >1=zoom in
+let chartOffset=0;
 
 function setChartPeriod(p,el){
-    chartPeriod=p;
+    chartPeriod=p;chartZoom=1.0;chartOffset=0;
     document.querySelectorAll('.cpb').forEach(e=>e.classList.remove('on'));
     el.classList.add('on');
     drawChart();
 }
 
-// MA計算
-function calcMA(data,period){
+// EMA計算
+function calcEMA(data,period){
+    const k=2/(period+1);
     const result=[];
+    let ema=null;
     for(let i=0;i<data.length;i++){
-        if(i<period-1){result.push(null);continue;}
-        let sum=0;
-        for(let j=i-period+1;j<=i;j++)sum+=data[j].c;
-        result.push(sum/period);
+        if(ema===null){
+            if(i<period-1){result.push(null);continue;}
+            let sum=0;for(let j=i-period+1;j<=i;j++)sum+=data[j].c;
+            ema=sum/period;
+        }else{
+            ema=data[i].c*k+ema*(1-k);
+        }
+        result.push(ema);
     }
     return result;
 }
+
+// ピンチ＆パン操作
+(function(){
+    let pinchDist=0,startZoom=1;
+    const area=()=>document.getElementById('chartArea');
+    
+    function dist(t){
+        const a=t[0],b=t[1];
+        return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+    }
+    
+    document.addEventListener('touchstart',function(e){
+        if(!area()||!area().contains(e.target))return;
+        if(e.touches.length===2){
+            e.preventDefault();
+            pinchDist=dist(e.touches);
+            startZoom=chartZoom;
+        }
+    },{passive:false});
+    
+    document.addEventListener('touchmove',function(e){
+        if(!area()||!area().contains(e.target))return;
+        if(e.touches.length===2&&pinchDist>0){
+            e.preventDefault();
+            const d=dist(e.touches);
+            const scale=d/pinchDist;
+            chartZoom=Math.max(0.3,Math.min(5,startZoom*scale));
+            drawChart();
+        }
+    },{passive:false});
+    
+    document.addEventListener('touchend',function(e){
+        pinchDist=0;
+    });
+    
+    // マウスホイール（デスクトップ）
+    document.addEventListener('wheel',function(e){
+        if(!area()||!area().contains(e.target))return;
+        e.preventDefault();
+        chartZoom=Math.max(0.3,Math.min(5,chartZoom*(e.deltaY>0?0.92:1.08)));
+        drawChart();
+    },{passive:false});
+})();
 
 function drawChart(){
     const canvas=document.getElementById('priceCanvas');
     const vCanvas=document.getElementById('volCanvas');
     if(!canvas||!candles.length)return;
     
-    // 期間フィルタ
-    const now=Date.now();
-    const ms={'15m':5400000,'1h':14400000,'4h':43200000,'1d':604800000};
-    const cutoff=now-(ms[chartPeriod]||14400000);
-    let data=candles.filter(c=>c.t>=cutoff);
-    if(data.length<5)data=candles.slice(-60);
-    if(data.length<2)return;
-    
-    // === メインチャート ===
     const dpr=window.devicePixelRatio||1;
     const rect=canvas.getBoundingClientRect();
     canvas.width=rect.width*dpr;
@@ -907,145 +951,180 @@ function drawChart(){
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;
     
+    // 期間フィルタ
+    const now=Date.now();
+    const msMap={'15m':3600000*1.5,'1h':3600000*4,'4h':3600000*12,'1d':86400000*7};
+    const span=(msMap[chartPeriod]||14400000)/chartZoom;
+    const cutoff=now-span;
+    let data=candles.filter(c=>c.t>=cutoff);
+    if(data.length<4)data=candles.slice(-(Math.max(20,Math.floor(60/chartZoom))));
+    if(data.length<2)return;
+    
     // 背景
-    ctx.fillStyle='#0a0a12';
+    ctx.fillStyle='#0b0b14';
     ctx.fillRect(0,0,W,H);
     
-    const allP=data.flatMap(c=>[c.h,c.l]);
-    const minP=Math.min(...allP);
-    const maxP=Math.max(...allP);
-    const range=maxP-minP||minP*0.01;
-    const padRange=range*0.08;
-    const pMin=minP-padRange,pMax=maxP+padRange;
-    const pRange=pMax-pMin;
-    
-    const priceR=52; // 右の価格軸スペース
-    const pad={t:6,b:2,l:2,r:priceR};
+    // レイアウト
+    const priceAxisW=58;
+    const pad={t:4,b:18,l:1,r:priceAxisW};
     const cW=W-pad.l-pad.r;
     const cH=H-pad.t-pad.b;
-    const candleW=Math.max(Math.floor(cW/data.length*0.7),2);
-    const gap=cW/data.length;
-    const yP=p=>pad.t+cH*(1-(p-pMin)/pRange);
     
-    // グリッド線
-    const gridLines=5;
-    ctx.strokeStyle='rgba(255,255,255,0.04)';
-    ctx.lineWidth=0.5;
-    for(let i=0;i<=gridLines;i++){
-        const gy=pad.t+(cH/gridLines)*i;
-        ctx.beginPath();ctx.moveTo(pad.l,gy);ctx.lineTo(W-pad.r,gy);ctx.stroke();
+    const allHL=data.flatMap(c=>[c.h,c.l]);
+    const rawMin=Math.min(...allHL),rawMax=Math.max(...allHL);
+    const pPad=(rawMax-rawMin)*0.06||rawMin*0.005;
+    const pMin=rawMin-pPad,pMax=rawMax+pPad;
+    const pRange=pMax-pMin||1e-10;
+    
+    const gap=cW/data.length;
+    const cndW=Math.max(Math.floor(gap*0.65),1);
+    const xC=i=>pad.l+gap*i+gap/2;
+    const yC=p=>pad.t+cH*(1-(p-pMin)/pRange);
+    
+    // 水平グリッド + 価格ラベル
+    const JPY=150;
+    const nGrid=5;
+    ctx.textAlign='right';
+    for(let i=0;i<=nGrid;i++){
+        const gy=pad.t+(cH/nGrid)*i;
+        ctx.strokeStyle='rgba(255,255,255,0.025)';
+        ctx.lineWidth=0.5;
+        ctx.beginPath();ctx.moveTo(pad.l,gy);ctx.lineTo(W-priceAxisW,gy);ctx.stroke();
     }
-    // 縦グリッド
-    const vLines=Math.min(6,data.length);
-    for(let i=0;i<=vLines;i++){
-        const gx=pad.l+(cW/vLines)*i;
+    // 垂直グリッド
+    const nVG=Math.min(5,Math.floor(data.length/8)||1);
+    for(let i=1;i<nVG;i++){
+        const gx=pad.l+(cW/nVG)*i;
+        ctx.strokeStyle='rgba(255,255,255,0.02)';
         ctx.beginPath();ctx.moveTo(gx,pad.t);ctx.lineTo(gx,H-pad.b);ctx.stroke();
     }
     
-    // ローソク足
-    const upC='#06d6a0',dnC='#ef4444';
+    // ローソク足描画
     for(let i=0;i<data.length;i++){
         const c=data[i];
-        const x=pad.l+gap*i+gap/2;
-        const isUp=c.c>=c.o;
-        const color=isUp?upC:dnC;
+        const x=xC(i);
+        const up=c.c>=c.o;
+        const col=up?'#2dc89e':'#ef4444';
         
-        // ヒゲ（高値-安値）
-        ctx.strokeStyle=color;
-        ctx.lineWidth=1;
+        // ヒゲ
+        ctx.strokeStyle=col;
+        ctx.lineWidth=Math.max(1,cndW>4?1.5:1);
         ctx.beginPath();
-        ctx.moveTo(x,yP(c.h));
-        ctx.lineTo(x,yP(c.l));
+        ctx.moveTo(x,yC(c.h));ctx.lineTo(x,yC(c.l));
         ctx.stroke();
         
         // 実体
-        const oY=yP(c.o),cY=yP(c.c);
-        const bodyTop=Math.min(oY,cY);
-        const bodyH=Math.max(Math.abs(oY-cY),1);
-        ctx.fillStyle=color;
-        ctx.fillRect(x-candleW/2,bodyTop,candleW,bodyH);
+        const oY=yC(c.o),cY=yC(c.c);
+        const top=Math.min(oY,cY);
+        const bH=Math.max(Math.abs(oY-cY),0.8);
+        if(up){
+            // 上昇：枠線のみ（Bybitスタイル）
+            ctx.strokeStyle=col;
+            ctx.lineWidth=1;
+            ctx.strokeRect(x-cndW/2,top,cndW,bH);
+        }else{
+            // 下降：塗り潰し
+            ctx.fillStyle=col;
+            ctx.fillRect(x-cndW/2,top,cndW,bH);
+        }
     }
     
-    // MA線
-    const maConfigs=[
-        {period:7,color:'#f0b90b',label:'MA7'},
-        {period:14,color:'#e879f9',label:'MA14'},
-        {period:28,color:'#38bdf8',label:'MA28'}
+    // EMA線
+    const emaConf=[
+        {p:7,color:'#f7931a',label:'EMA7'},
+        {p:14,color:'#e879f9',label:'EMA14'},
+        {p:28,color:'#38bdf8',label:'EMA28'}
     ];
-    const maLabelsEl=document.getElementById('maLabels');
-    let maHTML='';
+    const emaEl=document.getElementById('emaLabels');
+    let emaHTML='';
     
-    maConfigs.forEach(mc=>{
-        const ma=calcMA(data,mc.period);
+    emaConf.forEach(ec=>{
+        const ema=calcEMA(data,ec.p);
         ctx.beginPath();
-        ctx.strokeStyle=mc.color;
+        ctx.strokeStyle=ec.color;
         ctx.lineWidth=1;
         ctx.lineJoin='round';
-        let started=false;
-        let lastVal=null;
-        for(let i=0;i<ma.length;i++){
-            if(ma[i]===null)continue;
-            const x=pad.l+gap*i+gap/2;
-            if(!started){ctx.moveTo(x,yP(ma[i]));started=true;}
-            else ctx.lineTo(x,yP(ma[i]));
-            lastVal=ma[i];
+        let started=false,lastV=null;
+        for(let i=0;i<ema.length;i++){
+            if(ema[i]===null)continue;
+            const x=xC(i);
+            if(!started){ctx.moveTo(x,yC(ema[i]));started=true;}
+            else ctx.lineTo(x,yC(ema[i]));
+            lastV=ema[i];
         }
         ctx.stroke();
-        if(lastVal!==null){
-            const jpy=(lastVal*150);
-            const lbl=jpy<0.01?jpy.toFixed(6):jpy<1?jpy.toFixed(4):jpy.toFixed(2);
-            maHTML+=`<span style="color:${mc.color}">${mc.label}: ${lbl}</span>`;
+        if(lastV!==null){
+            const jpy=lastV*JPY;
+            const lbl=jpy<0.001?jpy.toFixed(6):jpy<0.01?jpy.toFixed(5):jpy<1?jpy.toFixed(4):jpy.toFixed(1);
+            emaHTML+=`<span style="color:${ec.color}">${ec.label}: ${lbl}</span>`;
         }
     });
-    if(maLabelsEl)maLabelsEl.innerHTML=maHTML;
+    if(emaEl)emaEl.innerHTML=emaHTML;
     
     // 右側価格軸
-    ctx.fillStyle='rgba(20,20,30,0.85)';
-    ctx.fillRect(W-priceR,0,priceR,H);
-    ctx.strokeStyle='rgba(255,255,255,0.06)';
+    ctx.fillStyle='#0d0d18';
+    ctx.fillRect(W-priceAxisW,0,priceAxisW,H);
+    ctx.strokeStyle='rgba(255,255,255,0.05)';
     ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(W-priceR,0);ctx.lineTo(W-priceR,H);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(W-priceAxisW,0);ctx.lineTo(W-priceAxisW,H);ctx.stroke();
     
-    const JPY=150;
-    ctx.font='9px JetBrains Mono,monospace';
+    ctx.font='10px JetBrains Mono,monospace';
     ctx.textAlign='right';
-    ctx.fillStyle='rgba(232,230,240,0.5)';
-    for(let i=0;i<=gridLines;i++){
-        const gy=pad.t+(cH/gridLines)*i;
-        const pv=pMax-((pMax-pMin)/gridLines)*i;
+    ctx.fillStyle='rgba(200,200,220,0.4)';
+    for(let i=0;i<=nGrid;i++){
+        const gy=pad.t+(cH/nGrid)*i;
+        const pv=pMax-((pMax-pMin)/nGrid)*i;
         const jpy=pv*JPY;
-        const lbl=jpy<0.01?jpy.toFixed(5):jpy<1?jpy.toFixed(4):jpy.toFixed(1);
-        ctx.fillText(lbl,W-6,gy+3);
+        const lbl=jpy<0.001?jpy.toFixed(5):jpy<0.01?jpy.toFixed(4):jpy<1?jpy.toFixed(3):jpy.toFixed(1);
+        ctx.fillText(lbl,W-6,gy+4);
     }
     
-    // 現在価格バッジ
+    // 現在価格水平ライン+バッジ
     const lastC=data[data.length-1];
-    const lastY=yP(lastC.c);
-    const isLastUp=lastC.c>=lastC.o;
-    const badgeCol=isLastUp?upC:dnC;
+    const lastY=yC(lastC.c);
+    const lastUp=lastC.c>=lastC.o;
+    const badge=lastUp?'#2dc89e':'#ef4444';
     
-    // ダッシュライン
-    ctx.setLineDash([2,2]);
-    ctx.strokeStyle=badgeCol+'60';
+    ctx.setLineDash([2,3]);
+    ctx.strokeStyle=badge+'70';
     ctx.lineWidth=0.8;
-    ctx.beginPath();ctx.moveTo(pad.l,lastY);ctx.lineTo(W-priceR,lastY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(pad.l,lastY);ctx.lineTo(W-priceAxisW,lastY);ctx.stroke();
     ctx.setLineDash([]);
     
-    // 価格バッジ（右端）
+    // 右端バッジ
     const lastJpy=lastC.c*JPY;
-    const priceLbl=lastJpy<0.01?lastJpy.toFixed(5):lastJpy<1?lastJpy.toFixed(4):lastJpy.toFixed(2);
-    ctx.fillStyle=badgeCol;
-    const bW=priceR-4;
+    const pLbl=lastJpy<0.001?lastJpy.toFixed(5):lastJpy<0.01?lastJpy.toFixed(4):lastJpy<1?lastJpy.toFixed(3):lastJpy.toFixed(1);
+    const badgeH=16,badgeW=priceAxisW-4;
+    ctx.fillStyle=badge;
     ctx.beginPath();
-    if(ctx.roundRect)ctx.roundRect(W-priceR+2,lastY-9,bW,18,3);
-    else ctx.rect(W-priceR+2,lastY-9,bW,18);
+    const bx=W-priceAxisW+2,by=lastY-badgeH/2;
+    if(ctx.roundRect)ctx.roundRect(bx,by,badgeW,badgeH,2);
+    else ctx.rect(bx,by,badgeW,badgeH);
     ctx.fill();
+    // 三角矢印
+    ctx.beginPath();
+    ctx.moveTo(bx,lastY-4);ctx.lineTo(bx-5,lastY);ctx.lineTo(bx,lastY+4);
+    ctx.fillStyle=badge;ctx.fill();
+    
     ctx.fillStyle='#fff';
     ctx.font='bold 9px JetBrains Mono,monospace';
     ctx.textAlign='right';
-    ctx.fillText(priceLbl,W-6,lastY+3);
+    ctx.fillText(pLbl,W-6,lastY+3);
     
-    // === ボリュームチャート ===
+    // 下部時刻軸
+    ctx.font='9px JetBrains Mono,monospace';
+    ctx.textAlign='center';
+    ctx.fillStyle='rgba(200,200,220,0.25)';
+    const tLabels=Math.min(5,data.length);
+    for(let i=0;i<tLabels;i++){
+        const idx=Math.floor((data.length-1)/(tLabels-1)*i);
+        const d=new Date(data[idx].t);
+        const x=xC(idx);
+        const lbl=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+        ctx.fillText(lbl,x,H-4);
+    }
+    
+    // === ボリューム ===
     if(vCanvas){
         const vr=vCanvas.getBoundingClientRect();
         vCanvas.width=vr.width*dpr;
@@ -1054,60 +1133,63 @@ function drawChart(){
         vc.scale(dpr,dpr);
         const vW=vr.width,vH=vr.height;
         
-        vc.fillStyle='#0a0a12';
+        vc.fillStyle='#0b0b14';
         vc.fillRect(0,0,vW,vH);
         
-        const maxVol=Math.max(...data.map(c=>c.v));
+        const maxV=Math.max(...data.map(c=>c.v));
         const vGap=cW/data.length;
-        const vBarW=Math.max(Math.floor(vGap*0.7),2);
+        const vBarW=Math.max(Math.floor(vGap*0.65),1);
         
-        // ボリューム MA
-        const volMA5=[],volMA10=[];
+        // ボリュームMA
+        const vma5=[],vma10=[];
         for(let i=0;i<data.length;i++){
-            if(i>=4){let s=0;for(let j=i-4;j<=i;j++)s+=data[j].v;volMA5.push(s/5);}else volMA5.push(null);
-            if(i>=9){let s=0;for(let j=i-9;j<=i;j++)s+=data[j].v;volMA10.push(s/10);}else volMA10.push(null);
+            if(i>=4){let s=0;for(let j=i-4;j<=i;j++)s+=data[j].v;vma5.push(s/5);}else vma5.push(null);
+            if(i>=9){let s=0;for(let j=i-9;j<=i;j++)s+=data[j].v;vma10.push(s/10);}else vma10.push(null);
         }
         
         for(let i=0;i<data.length;i++){
             const c=data[i];
             const x=pad.l+vGap*i+vGap/2;
-            const bH=maxVol>0?(c.v/maxVol)*(vH-4):1;
-            const isUp=c.c>=c.o;
-            vc.fillStyle=isUp?'rgba(6,214,160,0.5)':'rgba(239,68,68,0.5)';
+            const bH=maxV>0?(c.v/maxV)*(vH-6):1;
+            const up=c.c>=c.o;
+            vc.fillStyle=up?'rgba(45,200,158,0.45)':'rgba(239,68,68,0.45)';
             vc.fillRect(x-vBarW/2,vH-bH,vBarW,bH);
         }
         
-        // ボリュームMA線
-        [[volMA5,'#f0b90b'],[volMA10,'#e879f9']].forEach(([maData,col])=>{
-            vc.beginPath();
-            vc.strokeStyle=col;
-            vc.lineWidth=1;
-            let started=false;
-            for(let i=0;i<maData.length;i++){
-                if(maData[i]===null)continue;
+        // Vol MA線
+        [[vma5,'#f7931a'],[vma10,'#e879f9']].forEach(([md,col])=>{
+            vc.beginPath();vc.strokeStyle=col;vc.lineWidth=0.8;
+            let s=false;
+            for(let i=0;i<md.length;i++){
+                if(md[i]===null)continue;
                 const x=pad.l+vGap*i+vGap/2;
-                const bH=maxVol>0?(maData[i]/maxVol)*(vH-4):0;
-                if(!started){vc.moveTo(x,vH-bH);started=true;}
-                else vc.lineTo(x,vH-bH);
+                const bH=maxV>0?(md[i]/maxV)*(vH-6):0;
+                if(!s){vc.moveTo(x,vH-bH);s=true;}else vc.lineTo(x,vH-bH);
             }
             vc.stroke();
         });
         
         // 右軸
-        vc.fillStyle='rgba(20,20,30,0.85)';
-        vc.fillRect(vW-priceR,0,priceR,vH);
-        vc.strokeStyle='rgba(255,255,255,0.06)';
-        vc.lineWidth=1;
-        vc.beginPath();vc.moveTo(vW-priceR,0);vc.lineTo(vW-priceR,vH);vc.stroke();
+        vc.fillStyle='#0d0d18';
+        vc.fillRect(vW-priceAxisW,0,priceAxisW,vH);
+        vc.strokeStyle='rgba(255,255,255,0.05)';
+        vc.beginPath();vc.moveTo(vW-priceAxisW,0);vc.lineTo(vW-priceAxisW,vH);vc.stroke();
+        
+        // Volラベル
+        vc.font='8px JetBrains Mono,monospace';
+        vc.textAlign='right';
+        vc.fillStyle='rgba(200,200,220,0.3)';
+        const topV=maxV>1e6?(maxV/1e6).toFixed(1)+'M':maxV>1e3?(maxV/1e3).toFixed(0)+'K':maxV.toFixed(0);
+        vc.fillText(topV,vW-6,12);
+        vc.fillText('0',vW-6,vH-2);
     }
     
-    // 時間ラベル
-    const t0=new Date(data[0].t);
-    const t1=new Date(data[data.length-1].t);
-    const fmt=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    // 時間表示
+    const t0=new Date(data[0].t),t1=new Date(data[data.length-1].t);
+    const fmtD=d=>(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
     try{
-        document.getElementById('chartTimeL').textContent=(t0.getMonth()+1)+'/'+t0.getDate()+' '+fmt(t0);
-        document.getElementById('chartTimeR').textContent=(t1.getMonth()+1)+'/'+t1.getDate()+' '+fmt(t1);
+        document.getElementById('chartTimeL').textContent=fmtD(t0);
+        document.getElementById('chartTimeR').textContent=fmtD(t1);
     }catch(e){}
 }
 
@@ -1149,18 +1231,25 @@ async function loadMarketData(){
         }
         
         const ps=fmtPrice(price);
+        const jpyVal=(price*150);
+        const jpyStr=jpyVal<0.01?jpyVal.toFixed(5):jpyVal<1?jpyVal.toFixed(4):jpyVal.toFixed(2);
         try{document.getElementById('price').textContent=ps.replace('¥','');}catch(e){}
-        try{document.getElementById('chartPrice').textContent=ps;}catch(e){}
+        try{
+            const cp=document.getElementById('chartPrice');
+            cp.textContent=ps;
+            cp.style.color=change>=0?'#2dc89e':'#ef4444';
+        }catch(e){}
+        try{document.getElementById('chartJpy').textContent=jpyStr;}catch(e){}
         updateHighLow();
         drawChart();
     }
     try{
         const ch=document.getElementById('change');
-        ch.textContent=(change>=0?'+':'')+change.toFixed(1)+'%';
+        ch.textContent=(change>=0?'+':'')+change.toFixed(2)+'%';
         ch.className=change>=0?'t-up':'t-dn';
         const cc=document.getElementById('chartChg');
-        cc.textContent=(change>=0?'+':'')+change.toFixed(1)+'%';
-        cc.className='chart-chg '+(change>=0?'t-up':'t-dn');
+        cc.textContent=(change>=0?'+':'')+change.toFixed(2)+'%';
+        cc.className='cx-chg '+(change>=0?'t-up':'t-dn');
     }catch(e){}
     
     try{
