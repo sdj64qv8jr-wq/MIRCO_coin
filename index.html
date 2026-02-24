@@ -1209,8 +1209,8 @@ async function loadMarketData(){
         if(priceData.length>15000)priceData=priceData.slice(-12000);
         
         const ps=fmtPrice(price);
-        const jpyVal=(price*(typeof JPY_RATE!=='undefined'?JPY_RATE:150));
-        const jpyStr=jpyVal<0.01?jpyVal.toFixed(5):jpyVal<1?jpyVal.toFixed(4):jpyVal.toFixed(2);
+        const jpyVal=(price*JPY_RATE);
+        const jpyStr=jpyVal<0.01?jpyVal.toFixed(7):jpyVal<1?jpyVal.toFixed(5):jpyVal.toFixed(2);
         try{document.getElementById('price').textContent=ps.replace('¥','');}catch(e){}
         try{
             const cp=document.getElementById('chartPrice');
@@ -1346,8 +1346,19 @@ function calcSentiment(){let b=0,br=0;posts.forEach(p=>{if(p.votes>0)b+=p.votes;
 function pushActivity(msg){const el=document.getElementById('actFeed');if(el)el.innerHTML=`<div class="act-item">${msg}</div>`;}
 
 // ── ユーティリティ ──
-const JPY_RATE=150;
-function fmtPrice(p){if(!p||p===0)return'--';const jpy=p*JPY_RATE;if(jpy<0.0001)return'¥'+jpy.toFixed(7);if(jpy<0.01)return'¥'+jpy.toFixed(5);if(jpy<1)return'¥'+jpy.toFixed(4);if(jpy<100)return'¥'+jpy.toFixed(2);return'¥'+Math.floor(jpy).toLocaleString();}
+let JPY_RATE=149.5;
+// リアルタイムUSD/JPYレート取得
+(async function(){
+    try{
+        const r=await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+        if(r.ok){const d=await r.json();if(d.rates?.JPY)JPY_RATE=d.rates.JPY;}
+    }catch(e){}
+    try{
+        const r=await fetch('https://open.er-api.com/v6/latest/USD');
+        if(r.ok){const d=await r.json();if(d.rates?.JPY)JPY_RATE=d.rates.JPY;}
+    }catch(e){}
+})();
+function fmtPrice(p){if(!p||p===0)return'--';const jpy=p*JPY_RATE;if(jpy<0.0001)return'¥'+jpy.toFixed(8);if(jpy<0.01)return'¥'+jpy.toFixed(7);if(jpy<1)return'¥'+jpy.toFixed(5);if(jpy<100)return'¥'+jpy.toFixed(2);return'¥'+Math.floor(jpy).toLocaleString();}
 function fmtUsd(n){if(!n)return'--';const jpy=n*JPY_RATE;if(jpy>=1e12)return(jpy/1e12).toFixed(1)+'兆';if(jpy>=1e8)return(jpy/1e8).toFixed(1)+'億';if(jpy>=1e4)return(jpy/1e4).toFixed(1)+'万';return'¥'+Math.floor(jpy).toLocaleString();}
 function updateStats(){document.getElementById('sP').textContent=posts.length;document.getElementById('sC').textContent=posts.reduce((s,p)=>s+p.comments.length,0);document.getElementById('sA').textContent=agents.length;document.getElementById('sK').textContent=agents.reduce((s,a)=>s+a.karma,0);document.getElementById('sV').textContent=votes24h;const txEl=document.getElementById('sTx');if(liveData?.txns?.h24){const t=liveData.txns.h24;txEl.textContent=((t.buys||0)+(t.sells||0)).toLocaleString();}}
 function tAgo(ts){const d=Date.now()-ts,m=Math.floor(d/60000),h=Math.floor(d/3600000);if(h>0)return h+'時間前';if(m>0)return m+'分前';return'たった今';}
