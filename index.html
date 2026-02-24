@@ -1149,6 +1149,53 @@ function drawChart(){
 
 // ── マーケットデータ ──
 let apiSource='none';
+let poolAddress='';
+let ohlcvLoaded=false;
+
+// GeckoTerminal OHLCVから実データ取得（複数解像度マージ）
+async function fetchOHLCV(pool){
+    if(!pool||ohlcvLoaded)return;
+    const allPoints=new Map(); // timestamp -> price (dedup)
+    
+    // 長期→短期の順に取得（短期が上書きで高解像度優先）
+    const urls=[
+        // 日足（~200日分）
+        `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/day?aggregate=1&limit=200&currency=usd`,
+        // 1時間足（~41日分）
+        `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/hour?aggregate=1&limit=1000&currency=usd`,
+        // 15分足（~10日分）
+        `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/minute?aggregate=15&limit=1000&currency=usd`,
+        // 5分足（~3日分）
+        `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/minute?aggregate=5&limit=1000&currency=usd`,
+        // 1分足（~16時間分）
+        `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/minute?aggregate=1&limit=1000&currency=usd`
+    ];
+    
+    for(const url of urls){
+        try{
+            const r=await fetch(url);
+            if(!r.ok)continue;
+            const d=await r.json();
+            const list=d?.data?.attributes?.ohlcv_list;
+            if(!list||!list.length)continue;
+            for(const c of list){
+                const t=c[0]*1000;
+                const p=parseFloat(c[4]); // close
+                if(p>0)allPoints.set(t,p);
+            }
+        }catch(e){}
+    }
+    
+    if(allPoints.size>10){
+        priceData=Array.from(allPoints.entries())
+            .map(([t,p])=>({t,p}))
+            .sort((a,b)=>a.t-b.t);
+        ohlcvLoaded=true;
+        console.log('OHLCV total:',priceData.length,'points');
+        drawChart();
+    }
+}
+
 async function loadMarketData(){
     let pair=null;
     try{
@@ -1163,44 +1210,32 @@ async function loadMarketData(){
     if(!pair)return;
     liveData=pair;
     
+    // プールアドレス取得してOHLCV取得
+    if(pair.pairAddress&&!ohlcvLoaded){
+        poolAddress=pair.pairAddress;
+        await fetchOHLCV(poolAddress);
+    }
+    
     const price=parseFloat(pair.priceUsd||0);
     const change=parseFloat(pair.priceChange?.h24||pair.priceChange?.h6||0);
     if(price>0){
-        // 初回：APIの変動率からリアルな24hデータ生成
-        if(priceData.length===0){
+        // OHLCV未取得時のフォールバック（ブラウンブリッジ）
+        if(priceData.length===0&&!ohlcvLoaded){
             const rate=(change||0)/100;
             const p24hAgo=price/(1+rate);
             const now=Date.now();
-            const N=1440; // 1分刻み24h
-            
-            // ランダムウォークでリアルな値動き生成
-            // ブラウン運動 + ドリフト（最終的にprice着地）
-            const raw=new Array(N);
-            raw[0]=0;
-            const volatility=0.012; // 1.2%/ステップのボラティリティ
+            const N=1440;
+            const raw=new Array(N);raw[0]=0;
             for(let i=1;i<N;i++){
-                // Box-Muller法で正規分布
                 const u1=Math.random(),u2=Math.random();
-                const z=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
-                raw[i]=raw[i-1]+z*volatility;
+                raw[i]=raw[i-1]+Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2)*0.012;
             }
-            
-            // ブラウンブリッジ補正（始点=p24hAgo, 終点=price に正確に着地）
             const drift=raw[N-1];
+            for(let i=0;i<N;i++)raw[i]-=(i/(N-1))*drift;
+            const ls=Math.log(p24hAgo),le=Math.log(price);
             for(let i=0;i<N;i++){
-                const frac=i/(N-1);
-                raw[i]=raw[i]-frac*drift; // 終点を0に補正
-            }
-            
-            // 価格に変換
-            const logStart=Math.log(p24hAgo);
-            const logEnd=Math.log(price);
-            for(let i=0;i<N;i++){
-                const frac=i/(N-1);
-                const logTrend=logStart+(logEnd-logStart)*frac;
-                const t=now-86400000+60000*i;
-                const p=Math.exp(logTrend+raw[i]);
-                priceData.push({t,p:Math.max(p,1e-12)});
+                const f=i/(N-1);
+                priceData.push({t:now-86400000+60000*i,p:Math.max(Math.exp(ls+(le-ls)*f+raw[i]),1e-12)});
             }
         }
         
@@ -1220,9 +1255,10 @@ async function loadMarketData(){
         try{document.getElementById('chartJpy').textContent=jpyStr;}catch(e){}
         
         // 24h High/Low
-        const allP=priceData.map(d=>d.p);
-        try{document.getElementById('chartHigh').textContent=fmtPrice(Math.max(...allP));}catch(e){}
-        try{document.getElementById('chartLow').textContent=fmtPrice(Math.min(...allP));}catch(e){}
+        const day24=priceData.filter(d=>d.t>=Date.now()-86400000);
+        const dayP=day24.length>0?day24.map(d=>d.p):[price];
+        try{document.getElementById('chartHigh').textContent=fmtPrice(Math.max(...dayP));}catch(e){}
+        try{document.getElementById('chartLow').textContent=fmtPrice(Math.min(...dayP));}catch(e){}
         
         drawChart();
     }
